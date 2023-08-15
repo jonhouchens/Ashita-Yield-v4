@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
 -- Template for Yield metrics.
-metricsTemplate =
+local metricsTemplate =
 {
     totals =
     {
@@ -47,7 +47,7 @@ metricsTemplate =
 }
 
 -- Template for Yield state.
-stateTemplate =
+local stateTemplate =
 {
     window        = {},
     initializing  = true,
@@ -108,7 +108,7 @@ stateTemplate =
 }
 
 -- Template for Yield settings.
-defaultSettingsTemplate =
+local defaultSettingsTemplate =
 {
     general =
     {
@@ -159,7 +159,7 @@ defaultSettingsTemplate =
     },
     yields =
     {
-        harvesting = 
+        harvesting =
         {
             ["Mohbwa Grass"]           = { id = 2295, short = nil, singlePrice = 0, stackPrice = 0, stackSize = 12, color = -3877684, soundFile = "" },
             ["Fresh Marjoram"]         = { id = 1522, short = nil, singlePrice = 0, stackPrice = 0, stackSize = 12, color = -3877684, soundFile = "" },

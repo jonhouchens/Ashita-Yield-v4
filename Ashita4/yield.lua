@@ -26,13 +26,12 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
-_addon.name = 'Yield';
-_addon.description = 'Track and edit a variety of metrics related to gathering within a simple GUI.';
-_addon.author = 'Sjshovan (LoTekkie) Sjshovan@Gmail.com';
-_addon.version = '1.0.3';
-_addon.commands = {'/yield', '/yld'};
+addon.name = 'Yield';
+addon.desc = 'Track and edit a variety of metrics related to gathering within a simple GUI.';
+addon.author = 'Sjshovan (LoTekkie) Sjshovan@Gmail.com';
+addon.version = '1.0.3';
+addon.commands = {'/yield', '/yld'};
 
-require 'templates';
 require 'libs.baseprices';
 require 'libs.zonenames';
 require 'helpers';
@@ -40,8 +39,10 @@ require 'helpers';
 require 'common';
 require 'ffxi.enums';
 require 'ffxi.vanatime';
-require 'timer';
-require 'd3d8';
+
+local templates = require 'templates';
+local imgui = require 'imgui';
+local settings = require 'settings';
 
 --[[ #TODOs & Notes
     - cleanup code
@@ -51,14 +52,14 @@ require 'd3d8';
 ----------------------------------------------------------------------------------------------------
 -- Variables
 ----------------------------------------------------------------------------------------------------
-local settings = table.copy(defaultSettingsTemplate);
-local state    = table.copy(stateTemplate);
+local config = settings.load(templates.defaultSettingsTemplate);
+local state    = table.copy(templates.stateTemplate);
 local metrics  = {};
 local textures = {};
 
 local ashitaResourceManager = AshitaCore:GetResourceManager();
 local ashitaChatManager     = AshitaCore:GetChatManager();
-local ashitaDataManager     = AshitaCore:GetDataManager();
+local ashitaDataManager     = AshitaCore:GetMemoryManager();
 local ashitaParty           = ashitaDataManager:GetParty();
 local ashitaPlayer          = ashitaDataManager:GetPlayer();
 local ashitaInventory       = ashitaDataManager:GetInventory();
@@ -142,10 +143,10 @@ local helpTable =
         helpSeparator('=', 23),
         helpTitle('About'),
         helpSeparator('=', 23),
-        helpTypeEntry('Name', string.format("%s by Lotekkie & Narpt", _addon.name)),
-        helpTypeEntry('Description', _addon.description),
-        helpTypeEntry('Author', _addon.author),
-        helpTypeEntry('Version', _addon.version),
+        helpTypeEntry('Name', string.format("%s by Lotekkie & Narpt", addon.name)),
+        helpTypeEntry('Description', addon.description),
+        helpTypeEntry('Author', addon.author),
+        helpTypeEntry('Version', addon.version),
         helpTypeEntry('Support/Donate', "https://Paypal.me/Sjshovan OR For Gil donations: I play on Wings private server! (https://www.wingsxi.com/wings/) My in-game name is LoTekkie."),
         helpSeparator('=', 23),
     }
@@ -198,19 +199,19 @@ local uiVariables =
 ----------------------------------------------------------------------------------------------------
 function loadUiVariables()
     -- Load the UI variables..
-    imgui.SetVarValue(uiVariables["var_WindowOpacity"][1], settings.general.opacity);
-    imgui.SetVarValue(uiVariables["var_TargetValue"][1], settings.general.targetValue);
-    imgui.SetVarValue(uiVariables["var_ShowToolTips"][1], settings.general.showToolTips);
-    imgui.SetVarValue(uiVariables["var_WindowScaleIndex"][1], settings.general.windowScaleIndex);
-    imgui.SetVarValue(uiVariables["var_ShowDetailedYields"][1], settings.general.showDetailedYields);
-    imgui.SetVarValue(uiVariables["var_UseImageButtons"][1], settings.general.useImageButtons);
-    imgui.SetVarValue(uiVariables["var_EnableSoundAlerts"][1], settings.general.enableSoundAlerts);
-    imgui.SetVarValue(uiVariables["var_AutoGenReports"][1], settings.general.autoGenReports);
+    imgui.SetVarValue(uiVariables["var_WindowOpacity"][1], config.general.opacity);
+    imgui.SetVarValue(uiVariables["var_TargetValue"][1], config.general.targetValue);
+    imgui.SetVarValue(uiVariables["var_ShowToolTips"][1], config.general.showToolTips);
+    imgui.SetVarValue(uiVariables["var_WindowScaleIndex"][1], config.general.windowScaleIndex);
+    imgui.SetVarValue(uiVariables["var_ShowDetailedYields"][1], config.general.showDetailedYields);
+    imgui.SetVarValue(uiVariables["var_UseImageButtons"][1], config.general.useImageButtons);
+    imgui.SetVarValue(uiVariables["var_EnableSoundAlerts"][1], config.general.enableSoundAlerts);
+    imgui.SetVarValue(uiVariables["var_AutoGenReports"][1], config.general.autoGenReports);
 
-    local r, g, b, a = colorToRGBA(settings.general.yieldDetailsColor);
+    local r, g, b, a = colorToRGBA(config.general.yieldDetailsColor);
     imgui.SetVarValue(uiVariables["var_YieldDetailsColor"][1], r/255, g/255, b/255, a/255);
 
-    for gathering, yields in pairs(settings.yields) do -- per yield
+    for gathering, yields in pairs(config.yields) do -- per yield
         for yield, data in pairs(yields) do
             imgui.SetVarValue(uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1], data.singlePrice, data.stackPrice);
             local r, g, b, a = colorToRGBA(data.color);
@@ -222,7 +223,7 @@ function loadUiVariables()
             imgui.SetVarValue(uiVariables[string.format("var_%s_%s_soundFile", gathering, yield)][1], soundFile);
         end
         -- per gathering
-        imgui.SetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1], settings.priceModes[gathering]);
+        imgui.SetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1], config.priceModes[gathering]);
     end
 
     for gathering, data in pairs(metrics) do -- per metric
@@ -230,19 +231,19 @@ function loadUiVariables()
     end
 
     -- target sound file
-    local soundIndex = getSoundIndex(settings.general.targetSoundFile);
+    local soundIndex = getSoundIndex(config.general.targetSoundFile);
     imgui.SetVarValue(uiVariables["var_TargetSoundIndex"][1], soundIndex);
     local soundFile = sounds[soundIndex];
     imgui.SetVarValue(uiVariables["var_TargetSoundFile"][1], soundFile);
 
     -- fishing skill sound file
-    soundIndex = getSoundIndex(settings.general.fishingSkillSoundFile);
+    soundIndex = getSoundIndex(config.general.fishingSkillSoundFile);
     imgui.SetVarValue(uiVariables["var_FishingSkillSoundIndex"][1], soundIndex);
     soundFile = sounds[soundIndex];
     imgui.SetVarValue(uiVariables["var_FishingSkillSoundFile"][1], soundFile);
 
     -- clam break sound file
-    soundIndex = getSoundIndex(settings.general.clamBreakSoundFile);
+    soundIndex = getSoundIndex(config.general.clamBreakSoundFile);
     imgui.SetVarValue(uiVariables["var_ClamBreakSoundIndex"][1], soundIndex);
     soundFile = sounds[soundIndex];
     imgui.SetVarValue(uiVariables["var_ClamBreakSoundFile"][1], soundFile);
@@ -303,14 +304,35 @@ function updatePlayerStorage()
 end
 
 ----------------------------------------------------------------------------------------------------
+-- func: checkPlayerInactivity
+-- desc: Checks whether the player is gathering every second.
+----------------------------------------------------------------------------------------------------
+function checkPlayerInactivity()
+    if state.timers[state.gathering] then
+        state.values.inactivitySeconds = state.values.inactivitySeconds + 1;
+        if state.values.inactivitySeconds == 300 then -- 5min
+            for _, data in ipairs(gatherTypes) do
+                state.timers[data.name] = false; -- shutdown timers
+            end
+            displayResponse("Yield: Timers halted due to inactivity.", "\31\140%s");
+        end
+    else
+        state.values.inactivitySeconds = 0;
+    end
+    if state.attempting then
+        state.values.inactivitySeconds = 0;
+    end
+end
+
+----------------------------------------------------------------------------------------------------
 -- func: getPrice
 -- desc: Get the price for the given yield based on user settings.
 ----------------------------------------------------------------------------------------------------
 function getPrice(itemName, gatherType)
     if gatherType == nil then gatherType = state.gathering; end
-    local data = settings.yields[gatherType][itemName];
+    local data = config.yields[gatherType][itemName];
     local price = data.singlePrice or 0;
-    switch(settings.priceModes[gatherType]) : caseof
+    switch(config.priceModes[gatherType]) : caseof
     {
         [0] = function() price = data.stackPrice / data.stackSize or 0 end, -- stackPrice
         [2] = function() price = basePrices[data.id] or 0 end, -- NPCPrice
@@ -345,8 +367,8 @@ end
 ----------------------------------------------------------------------------------------------------
 function recordCurrentZone()
     local zoneId = getPlayerZoneId();
-    if not table.hasvalue(settings.zones[state.gathering], zoneId) then
-        table.insert(settings.zones[state.gathering], zoneId);
+    if not table.hasvalue(config.zones[state.gathering], zoneId) then
+        table.insert(config.zones[state.gathering], zoneId);
     end
 end
 
@@ -355,7 +377,7 @@ end
 -- desc: Calculate and normalize the value of progress towards reaching the target value.
 ----------------------------------------------------------------------------------------------------
 function calcTargetProgress()
-    local progress = metrics[state.gathering].estimatedValue/settings.general.targetValue
+    local progress = metrics[state.gathering].estimatedValue/config.general.targetValue
     if progress == math.huge or progress ~= progress then progress = 0.0 end
     if progress < 0 then progress = 0.0 end
     if progress > 1.0 then progress = 1.0 end
@@ -509,7 +531,7 @@ end
 -- desc: Play the user set sound for the given yield if alerts are enabled.
 ----------------------------------------------------------------------------------------------------
 function alertYield(yieldName)
-    local yieldData = settings.yields[state.gathering][yieldName];
+    local yieldData = config.yields[state.gathering][yieldName];
     if yieldData.soundFile ~= "" then
         return playAlert(yieldData.soundFile);
     end
@@ -521,7 +543,7 @@ end
 -- desc: Play the given sound file if alerts are enabled.
 ----------------------------------------------------------------------------------------------------
 function playAlert(soundFile)
-    if settings.general.enableSoundAlerts then
+    if config.general.enableSoundAlerts then
         playSound(soundFile);
         return true;
     end
@@ -534,7 +556,7 @@ end
 ----------------------------------------------------------------------------------------------------
 function playSound(soundFile)
     if soundFile ~= "" then
-        ashita.misc.play_sound(string.format(_addon.path.."sounds\\%s", soundFile));
+        ashita.misc.play_sound(string.format(addon.path.."sounds\\%s", soundFile));
     end
 end
 
@@ -556,7 +578,7 @@ end
 -- desc: Check if we should play the target value alert.
 ----------------------------------------------------------------------------------------------------
 function checkTargetAlertReady()
-    state.values.targetAlertReady = metrics[state.gathering].estimatedValue < settings.general.targetValue;
+    state.values.targetAlertReady = metrics[state.gathering].estimatedValue < config.general.targetValue;
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -564,7 +586,7 @@ end
 -- desc: Send an issue or feedback to github issues.
 ----------------------------------------------------------------------------------------------------
 function sendIssue(title, body)
-    io.popen(string.format('%s "%s" "%s"', _addon.path .. "tools\\sendissue.exe", title, body));
+    io.popen(string.format('%s "%s" "%s"', addon.path .. "tools\\sendissue.exe", title, body));
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -617,7 +639,7 @@ end
 function generateGatheringReport(gatherType)
     if gatherType == nil then gatherType = state.gathering; end
     if getPlayerName() == "" then return false; end
-    local zones = settings.zones[gatherType];
+    local zones = config.zones[gatherType];
     local zonesCount = table.count(zones);
     local metrics = metrics[gatherType];
     local zoneName = zoneNames[getPlayerZoneId()];
@@ -630,9 +652,9 @@ function generateGatheringReport(gatherType)
     local date = os.date('*t');
     local dateTimeStamp = string.format("%.4d_%.2d_%.2d__%.2d_%.2d_%.2d", date.year, date.month, date.day, date.hour, date.min, date.sec);
     local fname = string.format('%s__%s.log', zoneName, dateTimeStamp);
-    local fpath = string.format('%s/%s/%s/%s', _addon.path, 'reports', getPlayerName(), gatherType);
-    if (not ashita.file.dir_exists(fpath)) then
-        ashita.file.create_dir(fpath);
+    local fpath = string.format('%s/%s/%s/%s', addon.path, 'reports', getPlayerName(), gatherType);
+    if (not ashita.fs.dir_exists(fpath)) then
+        ashita.fs.create_dir(fpath);
     end
     local file = io.open(string.format('%s/%s', fpath, fname), 'w+');
     if (file ~= nil) then
@@ -642,7 +664,7 @@ function generateGatheringReport(gatherType)
         file:write("ZONES\n");
         file:write(sep);
         if zonesCount > 1 then
-            for i, id in ipairs(settings.zones[gatherType]) do
+            for i, id in ipairs(config.zones[gatherType]) do
                 local zoneName = zoneNames[id];
                 file:write("\t"..zoneName.."\n");
             end
@@ -663,8 +685,8 @@ function generateGatheringReport(gatherType)
         file:write(string.format("\tEstimated Value: %s\n", metrics.estimatedValue));
         file:write(string.format("\tYields per Hour: %.2f\n", metrics.points.yields[#metrics.points.yields]));
         file:write(string.format("\tValue per Hour: %.2f\n", metrics.points.values[#metrics.points.values]));
-        file:write(string.format("\tTarget Value: %s\n", settings.general.targetValue));
-        local targetReached = metrics.estimatedValue >= settings.general.targetValue;
+        file:write(string.format("\tTarget Value: %s\n", config.general.targetValue));
+        local targetReached = metrics.estimatedValue >= config.general.targetValue;
         local targetReachedAnswer = "No";
         if targetReached then targetReachedAnswer = "Yes"; end
         file:write(string.format("\tTarget Reached: %s\n", targetReachedAnswer));
@@ -691,28 +713,28 @@ end
 ----------------------------------------------------------------------------------------------------
 function saveSettings()
     -- Obtain the configuration variables..
-    settings.general.opacity               = imgui.GetVarValue(uiVariables["var_WindowOpacity"][1]);
-    settings.general.targetValue           = imgui.GetVarValue(uiVariables["var_TargetValue"][1]);
-    settings.general.showToolTips          = imgui.GetVarValue(uiVariables["var_ShowToolTips"][1]);
-    settings.general.windowScaleIndex      = imgui.GetVarValue(uiVariables["var_WindowScaleIndex"][1]);
-    settings.general.yieldDetailsColor     = colorTableToInt(imgui.GetVarValue(uiVariables["var_YieldDetailsColor"][1]));
-    settings.general.useImageButtons       = imgui.GetVarValue(uiVariables["var_UseImageButtons"][1]);
-    settings.general.enableSoundAlerts     = imgui.GetVarValue(uiVariables["var_EnableSoundAlerts"][1]);
-    settings.general.targetSoundFile       = imgui.GetVarValue(uiVariables["var_TargetSoundFile"][1]);
-    settings.general.fishingSkillSoundFile = imgui.GetVarValue(uiVariables["var_FishingSkillSoundFile"][1]);
-    settings.general.clamBreakSoundFile    = imgui.GetVarValue(uiVariables["var_ClamBreakSoundFile"][1]);
-    settings.general.autoGenReports        = imgui.GetVarValue(uiVariables["var_AutoGenReports"][1]);
+    config.general.opacity               = imgui.GetVarValue(uiVariables["var_WindowOpacity"][1]);
+    config.general.targetValue           = imgui.GetVarValue(uiVariables["var_TargetValue"][1]);
+    config.general.showToolTips          = imgui.GetVarValue(uiVariables["var_ShowToolTips"][1]);
+    config.general.windowScaleIndex      = imgui.GetVarValue(uiVariables["var_WindowScaleIndex"][1]);
+    config.general.yieldDetailsColor     = colorTableToInt(imgui.GetVarValue(uiVariables["var_YieldDetailsColor"][1]));
+    config.general.useImageButtons       = imgui.GetVarValue(uiVariables["var_UseImageButtons"][1]);
+    config.general.enableSoundAlerts     = imgui.GetVarValue(uiVariables["var_EnableSoundAlerts"][1]);
+    config.general.targetSoundFile       = imgui.GetVarValue(uiVariables["var_TargetSoundFile"][1]);
+    config.general.fishingSkillSoundFile = imgui.GetVarValue(uiVariables["var_FishingSkillSoundFile"][1]);
+    config.general.clamBreakSoundFile    = imgui.GetVarValue(uiVariables["var_ClamBreakSoundFile"][1]);
+    config.general.autoGenReports        = imgui.GetVarValue(uiVariables["var_AutoGenReports"][1]);
 
-    for gathering, yields in pairs(settings.yields) do
+    for gathering, yields in pairs(config.yields) do
         for yield, data in pairs(yields) do
-            local yieldSettings = settings.yields[gathering][yield];
+            local yieldSettings = config.yields[gathering][yield];
             local prices = imgui.GetVarValue(uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1]);
             yieldSettings.singlePrice = prices[1];
             yieldSettings.stackPrice  = prices[2];
             yieldSettings.color       = colorTableToInt(imgui.GetVarValue(uiVariables[string.format("var_%s_%s_color", gathering, yield)][1]));
             yieldSettings.soundFile   = imgui.GetVarValue(uiVariables[string.format("var_%s_%s_soundFile", gathering, yield)][1]);
         end
-        settings.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
+        config.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
     end
 
     for _, data in ipairs(gatherTypes) do
@@ -720,48 +742,51 @@ function saveSettings()
     end
 
     -- Obtain the metrics..
-    settings.metrics = table.copy(metrics);
+    config.metrics = table.copy(metrics);
 
     -- Obtain the state..
-    settings.state.gathering           = state.gathering;
-    settings.state.lastKnownGathering  = state.values.lastKnownGathering;
-    settings.state.windowPosX          = state.window.posX;
-    settings.state.windowPosY          = state.window.posY;
-    settings.state.clamBucketBroken    = state.values.clamBucketBroken;
-    settings.state.clamConfirmedYields = state.values.clamConfirmedYields;
-    settings.state.clamBucketTotal     = state.values.clamBucketTotal;
-    settings.state.clamBucketPz        = state.values.clamBucketPz;
-    settings.state.clamBucketPzMax     = state.values.clamBucketPzMax;
-    settings.state.firstLoad           = state.firstLoad;
+    config.state.gathering           = state.gathering;
+    config.state.lastKnownGathering  = state.values.lastKnownGathering;
+    config.state.windowPosX          = state.window.posX;
+    config.state.windowPosY          = state.window.posY;
+    config.state.clamBucketBroken    = state.values.clamBucketBroken;
+    config.state.clamConfirmedYields = state.values.clamConfirmedYields;
+    config.state.clamBucketTotal     = state.values.clamBucketTotal;
+    config.state.clamBucketPz        = state.values.clamBucketPz;
+    config.state.clamBucketPzMax     = state.values.clamBucketPzMax;
+    config.state.firstLoad           = state.firstLoad;
 
     -- Save the configuration variables..
-    ashita.settings.save(_addon.path .. 'settings/settings.json', settings);
+    settings.save();
 end
+
+settings.register('settings', 'settings_update', function (s)
+    if (s ~= nil) then
+        config = s
+    end
+
+    settings.save()
+end)
 
 ----------------------------------------------------------------------------------------------------
 -- func: load
 -- desc: Called when the addon is loaded.
 ----------------------------------------------------------------------------------------------------
-ashita.register_event('load', function()
+ashita.events.register('load', 'on_load', function()
     state.initializing = true
 
     -- Ensure the settings folder exists..
-    ashita.file.create_dir(_addon.path .. '/settings/');
-    ashita.file.create_dir(_addon.path .. '/reports/');
-    ashita.file.create_dir(_addon.path .. '/reports/' .. getPlayerName());
-
-    -- Load and merge the users settings..
-    settings = ashita.settings.load_merged(
-        _addon.path .. '/settings/settings.json', settings
-    )
+    ashita.fs.create_dir(addon.path .. '/settings/');
+    ashita.fs.create_dir(addon.path .. '/reports/');
+    ashita.fs.create_dir(addon.path .. '/reports/' .. getPlayerName());
 
     -- loop through gathering types..
     for _, data in ipairs(gatherTypes) do
         -- Populate the metrics table..
-        if table.haskey(settings.metrics, data.name) then
-            metrics[data.name] = table.copy(settings.metrics[data.name]);
+        if table.haskey(config.metrics, data.name) then
+            metrics[data.name] = table.copy(config.metrics[data.name]);
         else
-            metrics[data.name] = table.copy(metricsTemplate);
+            metrics[data.name] = table.copy(templates.metricsTemplate);
         end
         -- Initialize state timers..
         state.timers[data.name] = false;
@@ -769,7 +794,7 @@ ashita.register_event('load', function()
         uiVariables[string.format("var_%s_estimatedValue", data.name)] = { nil, ImGuiVar_UINT32, 0 }
         -- Add textures..
         local texturePath = string.format('images\\%s.png', data.name)
-        local hres, texture = ashita.d3dx.CreateTextureFromFileA(_addon.path .. texturePath);
+        local hres, texture = createTexture(addon.path .. texturePath);
 
         if texture == nil then
             state.values.btnTextureFailure = true;
@@ -780,22 +805,22 @@ ashita.register_event('load', function()
     end
 
     -- Update saved gathering state..
-    updateAllStates(settings.state.gathering);
+    updateAllStates(config.state.gathering);
 
     -- misc state updates..
     checkTargetAlertReady();
-    state.values.lastKnownGathering  = settings.state.lastKnownGathering;
-    state.window.posX                = settings.state.windowPosX;
-    state.window.posY                = settings.state.windowPosY;
-    state.values.clamBucketBroken    = settings.state.clamBucketBroken;
-    state.values.clamConfirmedYields = settings.state.clamConfirmedYields;
-    state.values.clamBucketTotal     = settings.state.clamBucketTotal;
-    state.values.clamBucketPz        = settings.state.clamBucketPz;
-    state.values.clamBucketPzMax     = settings.state.clamBucketPzMax;
-    state.firstLoad                  = settings.state.firstLoad;
+    state.values.lastKnownGathering  = config.state.lastKnownGathering;
+    state.window.posX                = config.state.windowPosX;
+    state.window.posY                = config.state.windowPosY;
+    state.values.clamBucketBroken    = config.state.clamBucketBroken;
+    state.values.clamConfirmedYields = config.state.clamConfirmedYields;
+    state.values.clamBucketTotal     = config.state.clamBucketTotal;
+    state.values.clamBucketPz        = config.state.clamBucketPz;
+    state.values.clamBucketPzMax     = config.state.clamBucketPzMax;
+    state.firstLoad                  = config.state.firstLoad;
 
     -- Add price ui variables from settings..
-    for gathering, yields in pairs(settings.yields) do
+    for gathering, yields in pairs(config.yields) do
         for yield, data in pairs(yields) do -- per yield
             uiVariables[string.format("var_%s_%s_prices", gathering, yield)] = { nil, ImGuiVar_INT32ARRAY, 2 };
             uiVariables[string.format("var_%s_%s_color", gathering, yield)] = { nil, ImGuiVar_FLOATARRAY, 4 };
@@ -807,7 +832,7 @@ ashita.register_event('load', function()
     end
 
     -- Retrieve sounds files..
-    for f in io.popen(string.format('dir "%s\\sounds" /b', _addon.path)):lines() do
+    for f in io.popen(string.format('dir "%s\\sounds" /b', addon.path)):lines() do
         sounds[#sounds + 1] = f;
     end
 
@@ -815,47 +840,22 @@ ashita.register_event('load', function()
     for _, data in ipairs(gatherTypes) do
         if not table.haskey(reports, data.name) then reports[data.name] = {}; end
         if getPlayerName() ~= "" then
-            local dirName = string.format("%s\\reports\\%s\\%s", _addon.path, getPlayerName(), data.name);
-            if ashita.file.dir_exists(dirName) then
+            local dirName = string.format("%s\\reports\\%s\\%s", addon.path, getPlayerName(), data.name);
+            if ashita.fs.dir_exists(dirName) then
                 for f in io.popen(string.format("dir %s /b", dirName)):lines() do
                     reports[data.name][#reports[data.name] + 1] = f;
                 end
             else
-                ashita.file.create_dir(dirName);
+                ashita.fs.create_dir(dirName);
             end
             state.reportsLoaded = true;
         end
     end
 
     -- Create timers..
-    if ashita.timer.create_timer("updatePlotPoints") then
-        ashita.timer.adjust_timer("updatePlotPoints", 1, 0, updatePlotPoints)
-        ashita.timer.start_timer("updatePlotPoints")
-    end
-    if ashita.timer.create_timer("updatePlayerStorage") then
-        ashita.timer.adjust_timer("updatePlayerStorage", 1, 0, updatePlayerStorage)
-        ashita.timer.start_timer("updatePlayerStorage")
-    end
-
-    if ashita.timer.create_timer("inactivityCheck") then
-        ashita.timer.adjust_timer("inactivityCheck", 1, 0, function()
-            if state.timers[state.gathering] then
-                state.values.inactivitySeconds = state.values.inactivitySeconds + 1;
-                if state.values.inactivitySeconds == 300 then -- 5min
-                    for _, data in ipairs(gatherTypes) do
-                        state.timers[data.name] = false; -- shutdown timers
-                    end
-                    displayResponse("Yield: Timers halted due to inactivity.", "\31\140%s");
-                end
-            else
-                state.values.inactivitySeconds = 0;
-            end
-            if state.attempting then
-                state.values.inactivitySeconds = 0;
-            end
-        end)
-        ashita.timer.start_timer("inactivityCheck")
-    end
+    updatePlotPoints:loop(1, function() return true end);
+    updatePlayerStorage:loop(1, function() return true end);
+    checkPlayerInactivity:loop(1, function() return true end);
 
     -- Initialize custom variables..
     for varName, data in pairs(uiVariables) do
@@ -881,14 +881,9 @@ end)
 -- func: unload
 -- desc: Called when the addon is unloaded.
 ----------------------------------------------------------------------------------------------------
-ashita.register_event('unload', function()
+ashita.events.register('unload', 'on_unload', function()
     -- Save the settings file..
     saveSettings();
-
-    -- Remove timers..
-    ashita.timer.remove_timer("updatePlotPoints");
-    ashita.timer.remove_timer("updatePlayerStorage");
-    ashita.timer.remove_timer("inactivityCheck");
 
     -- Cleanup the custom variables..
     for varName, data in pairs(uiVariables) do
@@ -903,10 +898,10 @@ end)
 -- func: command
 -- desc: Called when the addon is handling a command.
 ---------------------------------------------------------------------------------------------------
-ashita.register_event('command', function(command, ntype)
-    local commandArgs = command:lower():args();
+ashita.events.register('command', 'on_command', function(e)
+    local commandArgs = e:args();
 
-    if not table.hasvalue(_addon.commands, commandArgs[1]) then
+    if not table.hasvalue(addon.commands, commandArgs[1]) then
         return false;
     end
 
@@ -917,7 +912,7 @@ ashita.register_event('command', function(command, ntype)
         AshitaCore:GetChatManager():QueueCommand('/addon reload yield', 1);
 
     elseif commandArgs[2] == 'unload' or commandArgs[2] == 'u' then
-        response_message = 'Thank you for using Yield. Goodbye.';
+        responseMessage = 'Thank you for using Yield. Goodbye.';
         AshitaCore:GetChatManager():QueueCommand('/addon unload yield', 1);
 
     elseif commandArgs[2] == 'about' or commandArgs[2] == 'a' then
@@ -933,14 +928,14 @@ ashita.register_event('command', function(command, ntype)
         settings.general.windowScaleIndex = cycleIndex(settings.general.windowScaleIndex, 0, 2, 1);
     --]]
     elseif commandArgs[2] == "find" or commandArgs[2] == 'f' then
-        imgui.SetWindowPos(string.format("%s v%s by Lotekkie & Narpt", _addon.name, _addon.version), 0, 0);
+        imgui.SetWindowPos(string.format("%s v%s by Lotekkie & Narpt", addon.name, addon.version), 0, 0);
     else
         displayHelp(helpTable.commands);
     end
 
     if responseMessage ~= "" then
         displayResponse(
-            commandResponse(response_message, success)
+            commandResponse(responseMessage, success)
         );
     end
 
@@ -951,14 +946,14 @@ end)
 -- func: incoming_text
 -- desc: Event called when the addon is asked to handle an incoming chat line.
 ---------------------------------------------------------------------------------------------------
-ashita.register_event('incoming_text', function(mode, message, modifiedmode, modifiedmessage, blocked)
-
+ashita.events.register('text_in', 'on_text_in', function(e)
+    -- TODO: unsure if e.mode is correct, or if we need to mask the first byte
     -- Ensure proper chat modes..
-    if not table.hasvalue({919, 654, 702, 662, 664, 129}, mode) then state.attempting = false; return false; end
-    if (blocked) then state.attempting = false; return false; end
+    if not table.hasvalue({919, 654, 702, 662, 664, 129}, e.mode) then state.attempting = false; return false; end
+    if (e.blocked) then state.attempting = false; return false; end
 
     -- Remove colors form message..
-    message = string.strip_colors(message);
+    local message = string.strip_colors(e.message);
     message = string.lower(message);
 
     -- Ensure we care..
@@ -1046,7 +1041,7 @@ ashita.register_event('incoming_text', function(mode, message, modifiedmode, mod
                 end
                 if broken or unable then
                     state.values.clamBucketBroken = true;
-                    ashita.timer.once(1, function () -- let plots update a second
+                    ashita.tasks.once(1, function () -- let plots update a second
                         state.timers[state.gathering] = false;
                     end);
                     saveSettings();
@@ -1069,7 +1064,7 @@ ashita.register_event('incoming_text', function(mode, message, modifiedmode, mod
         end
         if success then
             success = string.lowerToTitle(success);
-            if not table.haskey(settings.yields[state.gathering], success) then
+            if not table.haskey(config.yields[state.gathering], success) then
                 displayResponse(string.format("Yield: The %s yield name (%s) is unrecognized! Please report this to LoTekkie.", state.gathering, success), "\31\167%s");
                 state.attempting = false;
                 return false;
@@ -1077,7 +1072,7 @@ ashita.register_event('incoming_text', function(mode, message, modifiedmode, mod
             val = getPrice(success);
             adjYield(success, 1);
             if state.gathering == "clamming" then
-                state.values.clamBucketPz = state.values.clamBucketPz + settings.yields[state.gathering][success].pz
+                state.values.clamBucketPz = state.values.clamBucketPz + config.yields[state.gathering][success].pz
             end
             local soundPlaying = alertYield(success);
             if successBreak then adjTotal("breaks", 1); end
@@ -1096,7 +1091,7 @@ ashita.register_event('incoming_text', function(mode, message, modifiedmode, mod
         curVal = metrics[state.gathering].estimatedValue;
         metrics[state.gathering].estimatedValue = curVal + val;
         imgui.SetVarValue(uiVariables[string.format("var_%s_estimatedValue", state.gathering)][1], metrics[state.gathering].estimatedValue);
-        local targetReached = metrics[state.gathering].estimatedValue >= settings.general.targetValue;
+        local targetReached = metrics[state.gathering].estimatedValue >= config.general.targetValue;
         if state.values.targetAlertReady and targetReached then
             local soundFile = imgui.GetVarValue(uiVariables["var_TargetSoundFile"][1]);
             playAlert(soundFile);
@@ -1110,8 +1105,8 @@ end);
 -- func: outgoing_packet
 -- desc: Event called when the client is sending a packet to the server.
 ----------------------------------------------------------------------------------------------------
-ashita.register_event('outgoing_packet', function(id, size, packet, packet_modified, blocked)
-    if id == 0x36 then -- helm
+ashita.events.register('packet_out', 'on_packet_out', function(e)
+    if e.id == 0x36 then -- helm
         for gathering, data in pairs(gatherTypes) do
             if data.target == ashitaTarget:GetTargetName() then
                 state.attempting = true;
@@ -1119,20 +1114,20 @@ ashita.register_event('outgoing_packet', function(id, size, packet, packet_modif
                 state.gathering = data.name;
             end
         end
-    elseif id == 0x01A then -- clam
+    elseif e.id == 0x01A then -- clam
         if ashitaTarget:GetTargetName() == "Clamming Point" and AshitaCore:GetDataManager():GetPlayer():HasKeyItem(511) then
             state.attempting = true;
             state.attemptType = "clamming";
             state.gathering = "clamming";
-        elseif struct.unpack("H", packet, 0x0A) == 0x1104 then -- digging
+        elseif struct.unpack("H", e.data, 0x0A) == 0x1104 then -- digging
             state.attempting = true;
             state.attemptType = "digging";
             state.gathering = "digging";
         else
             state.attempting = false;
         end
-    elseif id == 0x110 then -- fishing
-        local action = struct.unpack("H", packet, 0x0E + 1);
+    elseif e.id == 0x110 then -- fishing
+        local action = struct.unpack("H", e.data, 0x0E + 1);
         if action ~= 4 then
             state.attempting = true;
             state.attemptType = "fishing";
@@ -1145,11 +1140,11 @@ ashita.register_event('outgoing_packet', function(id, size, packet, packet_modif
 end);
 
 ----------------------------------------------------------------------------------------------------
--- func: incoming_packet
+-- func: on_packet_in
 -- desc: Event called when the client is receiving a packet from the server.
 ----------------------------------------------------------------------------------------------------
-ashita.register_event('incoming_packet', function(id, size, packet, packet_modified, blocked)
-    if id == 0x00B then -- zoning out (11)
+ashita.events.register('packet_in', 'on_packet_in', function(e)
+    if e.id == 0x00B then -- zoning out (11)
         state.attempting = false;
         state.values.zoning = true;
         state.values.preZoneCounts["available"] = playerStorage['available'];
@@ -1159,12 +1154,12 @@ ashita.register_event('incoming_packet', function(id, size, packet, packet_modif
             state.values.preZoneCounts[data.tool] = playerStorage[data.tool];
         end
         if state.values.lastKnownGathering ~= nil then
-            if settings.general.autoGenReports then
+            if config.general.autoGenReports then
                 generateGatheringReport(state.values.lastKnownGathering);
             end
             state.values.lastKnownGathering = nil;
         end
-    elseif (id == 0x01D and state.values.zoning) then -- inventory ready
+    elseif (e.id == 0x01D and state.values.zoning) then -- inventory ready
           state.values.zoning = false;
     end
     return false;
@@ -1251,11 +1246,11 @@ local SettingsWindow =
         local yieldsExist = table.count(metrics[state.settings.setPrices.gathering].yields) > 0;
         if state.settings.activeIndex == 2 and yieldsExist then -- if we are setting prices
             local spaceBtnRecalculate = state.window.spaceBtnRecalculate;
-            if settings.general.showToolTips then spaceBtnRecalculate = spaceBtnRecalculate - ( imgui.GetFontSize() * 24 / defaultFontSize ) end
+            if config.general.showToolTips then spaceBtnRecalculate = spaceBtnRecalculate - ( imgui.GetFontSize() * 24 / defaultFontSize ) end
             if state.window.scale == 1.15 then spaceBtnRecalculate = spaceBtnRecalculate + 3 end;
             if state.window.scale == 1.30 then spaceBtnRecalculate = spaceBtnRecalculate + 6 end;
             imgui.SameLine(0.0, spaceBtnRecalculate);
-            if imguiShowToolTip("Recalculate the estimated value with your current price settings.", settings.general.showToolTips) then
+            if imguiShowToolTip("Recalculate the estimated value with your current price settings.", config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             if imgui.Button("Recalculate Value") then
@@ -1343,8 +1338,8 @@ local helpWindow =
 -- func: render
 -- desc: Called when the addon is rendering.
 ----------------------------------------------------------------------------------------------------
-ashita.register_event('render', function()
-    local windowScale           = windowScales[settings.general.windowScaleIndex];
+ashita.events.register('d3d_present', 'on_d3d_present', function()
+    local windowScale           = windowScales[config.general.windowScaleIndex];
     local scaledFontSize        = windowScale*defaultFontSize;
 
     local scaledHeightReduction = 0;
@@ -1353,7 +1348,7 @@ ashita.register_event('render', function()
     imgui.PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0);
     imgui.PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0);
     imgui.PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 5.0);
-    imgui.PushStyleVar(ImGuiStyleVar_Alpha, settings.general.opacity);
+    imgui.PushStyleVar(ImGuiStyleVar_Alpha, config.general.opacity);
     imgui.PushStyleVar(ImGuiStyleVar_WindowPadding, scaledFontSize*5/defaultFontSize, scaledFontSize*5/defaultFontSize);
     imgui.PushStyleColor(ImGuiCol_Border, 0.21, 0.47, 0.59, 0.5);
     imgui.PushStyleColor(ImGuiCol_PlotLines, 0.77, 0.83, 0.80, 0.3);
@@ -1368,7 +1363,7 @@ ashita.register_event('render', function()
     elseif state.initializing then
         imgui.SetNextWindowPos(state.window.posX , state.window.posY);
     end
-    if not imgui.Begin(string.format("%s v%s by Lotekkie & Narpt", _addon.name, _addon.version), imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
+    if not imgui.Begin(string.format("%s v%s by Lotekkie & Narpt", addon.name, addon.version), imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
         imgui.End();
         return
     end
@@ -1417,13 +1412,13 @@ ashita.register_event('render', function()
 
     if getPlayerName() ~= "" and not state.reportsLoaded then
         for _, data in ipairs(gatherTypes) do
-            local dirName = string.format("%s\\reports\\%s\\%s", _addon.path, getPlayerName(), data.name);
-            if ashita.file.dir_exists(dirName) then
+            local dirName = string.format("%s\\reports\\%s\\%s", addon.path, getPlayerName(), data.name);
+            if ashita.fs.dir_exists(dirName) then
                 for f in io.popen(string.format("dir %s /b", dirName)):lines() do
                     reports[data.name][#reports[data.name] + 1] = f;
                 end
             else
-                ashita.file.create_dir(dirName);
+                ashita.fs.create_dir(dirName);
             end
         end
         state.reportsLoaded = true;
@@ -1444,7 +1439,7 @@ ashita.register_event('render', function()
             imgui.SetVarValue(uiVariables["var_AllSoundIndex"][1], 0);
         end
         for _, data in ipairs(gatherTypes) do
-            if state.values.btnTextureFailure or not settings.general.useImageButtons then
+            if state.values.btnTextureFailure or not config.general.useImageButtons then
                 imguiPushActiveBtnColor(data.name == state.gathering);
                 if imgui.SmallButton(string.upperfirst(data.short)) then
                     btnAction(data);
@@ -1470,7 +1465,7 @@ ashita.register_event('render', function()
     imguiHalfSep();
 
     -- MAIN_HEADER
-    if imguiShowToolTip(string.format("Progress towards your target value (adjusted within settings)."), settings.general.showToolTips) then
+    if imguiShowToolTip(string.format("Progress towards your target value (adjusted within settings)."), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip)
     end
     if imgui.BeginChild("Header", -1, state.window.heightHeaderMain) then
@@ -1484,7 +1479,7 @@ ashita.register_event('render', function()
         else
             imgui.PushStyleColor(ImGuiCol_Text, 0.39, 0.96, 0.13, 1); -- success
         end
-        imgui.ProgressBar(progress, -1, state.window.heightHeaderMain, string.format("%s/%s", metrics[state.gathering].estimatedValue, settings.general.targetValue))
+        imgui.ProgressBar(progress, -1, state.window.heightHeaderMain, string.format("%s/%s", metrics[state.gathering].estimatedValue, config.general.targetValue))
         imgui.PopStyleColor();
         imgui.EndChild();
     end
@@ -1495,7 +1490,7 @@ ashita.register_event('render', function()
     -- totals metrics
     for total, metric in pairs(table.sortKeysByLength(metrics[state.gathering].totals, true)) do
         if state.gathering == "digging" and metric == "breaks" then
-            if imguiShowToolTip("Current Moon percentage.", settings.general.showToolTips) then
+            if imguiShowToolTip("Current Moon percentage.", config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             imgui.Text(string.format("%s:", string.upperfirst("Moon")));
@@ -1503,7 +1498,7 @@ ashita.register_event('render', function()
             local moonPct = tostring(ashita.ffxi.vanatime.get_current_date().moon_percent);
             imgui.TextUnformatted(moonPct.."%");
         else
-            if imguiShowToolTip(metricsTotalsToolTips[metric], settings.general.showToolTips) then
+            if imguiShowToolTip(metricsTotalsToolTips[metric], config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             imgui.Text(string.format("%s:", string.upperfirst(metric)));
@@ -1514,7 +1509,7 @@ ashita.register_event('render', function()
             imgui.SameLine();
             imgui.Text("~");
             imgui.SameLine();
-            if imguiShowToolTip("Total pz value in current bucket (will turn red when within 5 points of limit). ", settings.general.showToolTips) then
+            if imguiShowToolTip("Total pz value in current bucket (will turn red when within 5 points of limit). ", config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             local pzDiff = state.values.clamBucketPzMax - state.values.clamBucketPz;
@@ -1532,7 +1527,7 @@ ashita.register_event('render', function()
     -- totals metrics
 
     -- gathering tools
-    if imguiShowToolTip("Total gathering tools on hand.", settings.general.showToolTips) then
+    if imguiShowToolTip("Total gathering tools on hand.", config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
     local gatherData = getGatherTypeData();
@@ -1573,7 +1568,7 @@ ashita.register_event('render', function()
     -- /gathering tools
 
     -- inventory
-    if imguiShowToolTip("Total inventory slots available (main inventory only).", settings.general.showToolTips) then
+    if imguiShowToolTip("Total inventory slots available (main inventory only).", config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
     local availPct = playerStorage['available_pct'];
@@ -1596,7 +1591,7 @@ ashita.register_event('render', function()
     -- /inventory
 
     -- time passed
-    if imguiShowToolTip(string.format("Time passed since your first %s attempt or when the timer was manually started.", string.upperfirst(state.gathering)), settings.general.showToolTips) then
+    if imguiShowToolTip(string.format("Time passed since your first %s attempt or when the timer was manually started.", string.upperfirst(state.gathering)), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
     imgui.Text("Time Passed:");
@@ -1611,7 +1606,7 @@ ashita.register_event('render', function()
     imgui.Spacing();
 
     -- timer
-    if imguiShowToolTip(string.format("Start, stop, or clear the %s timer.", string.upperfirst(state.gathering)), settings.general.showToolTips) then
+    if imguiShowToolTip(string.format("Start, stop, or clear the %s timer.", string.upperfirst(state.gathering)), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
     imgui.Text("Timer:")
@@ -1635,12 +1630,12 @@ ashita.register_event('render', function()
     imgui.AlignFirstTextHeightToWidgets();
     -- value
     imgui.PushStyleColor(ImGuiCol_Text, 0.39, 0.96, 0.13, 1); -- success
-    if imguiShowToolTip(string.format("Editable estimated value of all %s yields (yield prices adjusted within settings).", string.upperfirst(state.gathering)), settings.general.showToolTips) then
+    if imguiShowToolTip(string.format("Editable estimated value of all %s yields (yield prices adjusted within settings).", string.upperfirst(state.gathering)), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
 
     imgui.Text("Value:")
-    if settings.general.showToolTips then
+    if config.general.showToolTips then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     else
         imgui.SameLine();
@@ -1670,7 +1665,7 @@ ashita.register_event('render', function()
     }
     imgui.AlignFirstTextHeightToWidgets();
     local plotYieldsLabel = yieldsLabelMap[state.values.yieldsLabelIndex];
-    if imguiShowToolTip(string.format("Plot histogram of %s yields per hour (click the on plot to cycle its label displays).", string.upperfirst(state.gathering)), settings.general.showToolTips) then
+    if imguiShowToolTip(string.format("Plot histogram of %s yields per hour (click the on plot to cycle its label displays).", string.upperfirst(state.gathering)), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
 
@@ -1712,7 +1707,7 @@ ashita.register_event('render', function()
         [3] = ""
     }
     local plotValuesLabel = valuesLabelMap[state.values.valuesLabelIndex];
-    if imguiShowToolTip("Plot lines of the estimated value per hour (L/R click on the plot to cycle its label displays).", settings.general.showToolTips) then
+    if imguiShowToolTip("Plot lines of the estimated value per hour (L/R click on the plot to cycle its label displays).", config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
 
@@ -1748,7 +1743,7 @@ ashita.register_event('render', function()
 
     -- MAIN_SCROLLING
     imgui.AlignFirstTextHeightToWidgets();
-    if imguiShowToolTip(string.format("Scrollable List of current %s yields and their amounts (L/R click on the list to cycle its sorting methods).", string.upperfirst(state.gathering)), settings.general.showToolTips) then
+    if imguiShowToolTip(string.format("Scrollable List of current %s yields and their amounts (L/R click on the list to cycle its sorting methods).", string.upperfirst(state.gathering)), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
 
@@ -1767,7 +1762,7 @@ ashita.register_event('render', function()
         -- yields
         imgui.PushTextWrapPos(imgui.GetContentRegionAvailWidth());
         for _, item in pairs(yieldsSortMap[state.values.yieldSortIndex][1]) do
-            if settings.general.showToolTips then
+            if config.general.showToolTips then
                 imgui.SetCursorPosX(imgui.GetCursorPosX() - 3.0);
                 imgui.TextDisabled('(?)');
                 if imgui.IsItemHovered() then
@@ -1809,9 +1804,9 @@ ashita.register_event('render', function()
                 imgui.SetTooltip(string.format("Sort Type: %s", yieldsSortMap[state.values.yieldSortIndex][2]));
             end
             imgui.SameLine(0.0, state.window.spaceToolTip);
-            local r, g, b, a = colorToRGBA(settings.yields[state.gathering][item].color);
+            local r, g, b, a = colorToRGBA(config.yields[state.gathering][item].color);
 
-            local shortName = settings.yields[state.gathering][item].short;
+            local shortName = config.yields[state.gathering][item].short;
             local adjItemName = shortName or item;
 
             imgui.TextColored(r/255, g/255, b/255, a/255, adjItemName..":");
@@ -1819,9 +1814,9 @@ ashita.register_event('render', function()
             imgui.SameLine(0.0, state.window.spaceToolTip);
             imgui.Text(metrics[state.gathering].yields[item]);
 
-            if settings.general.showDetailedYields then
+            if config.general.showDetailedYields then
                 local pricePer = getPrice(item);
-                local r, g, b, a = colorToRGBA(settings.general.yieldDetailsColor);
+                local r, g, b, a = colorToRGBA(config.general.yieldDetailsColor);
                 imgui.TextColored(r/255, g/255, b/255, a/255, string.format("@%dea.=(%s)", getPrice(item), math.floor(getPrice(item) * metrics[state.gathering].yields[item])));
             end
         end
@@ -1880,11 +1875,11 @@ ashita.register_event('render', function()
     if imgui.Button("Reset") then
         state.actions.modalConfirmAction = function()
             -- Generate report..
-            if settings.general.autoGenReports then
+            if config.general.autoGenReports then
                 generateGatheringReport(state.gathering);
             end
             -- Reset the metrics..
-            metrics[state.gathering] = table.copy(metricsTemplate);
+            metrics[state.gathering] = table.copy(templates.metricsTemplate);
             -- Reset the timers..
             for timerName, running in pairs(state.timers) do
                 state.timers[timerName] = false
@@ -1892,7 +1887,7 @@ ashita.register_event('render', function()
             -- Reset ui variables..
             imgui.SetVarValue(uiVariables[string.format("var_%s_estimatedValue", state.gathering)][1], metrics[state.gathering].estimatedValue);
             -- Reset the zones..
-            settings.zones[state.gathering] = {};
+            config.zones[state.gathering] = {};
             state.values.lastKnownGathering = nil;
         end
         state.values.modalConfirmPrompt = string.format(modalConfirmPromptTemplate, "Reset");
@@ -2011,24 +2006,24 @@ function renderSettingsGeneral()
         imgui.TextColored(1, 1, 0.54, 1, "Window");
 
         local spaceSettingsDefaults = state.window.spaceSettingsDefaults;
-        if settings.general.showToolTips then spaceSettingsDefaults = spaceSettingsDefaults - ( imgui.GetFontSize() * 24 / defaultFontSize ) end
+        if config.general.showToolTips then spaceSettingsDefaults = spaceSettingsDefaults - ( imgui.GetFontSize() * 24 / defaultFontSize ) end
         imgui.SameLine(0.0, spaceSettingsDefaults);
-        if imguiShowToolTip("Set all general settings to their defaults.", settings.general.showToolTips) then
+        if imguiShowToolTip("Set all general settings to their defaults.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
 
         --imgui.PushStyleColor(ImGuiCol_Button, 0.21, 0.47, 0.59, 1); -- info
         if imgui.Button("Defaults") then
-            settings.general = table.copy(defaultSettingsTemplate.general);
-            imgui.SetVarValue(uiVariables["var_WindowOpacity"][1], settings.general.opacity);
-            imgui.SetVarValue(uiVariables["var_TargetValue"][1], settings.general.targetValue);
-            imgui.SetVarValue(uiVariables["var_ShowToolTips"][1], settings.general.showToolTips);
-            imgui.SetVarValue(uiVariables["var_WindowScaleIndex"][1], settings.general.windowScaleIndex);
-            imgui.SetVarValue(uiVariables["var_ShowDetailedYields"][1], settings.general.showDetailedYields);
-            imgui.SetVarValue(uiVariables["var_UseImageButtons"][1], settings.general.useImageButtons);
+            config.general = table.copy(templates.defaultSettingsTemplate.general);
+            imgui.SetVarValue(uiVariables["var_WindowOpacity"][1], config.general.opacity);
+            imgui.SetVarValue(uiVariables["var_TargetValue"][1], config.general.targetValue);
+            imgui.SetVarValue(uiVariables["var_ShowToolTips"][1], config.general.showToolTips);
+            imgui.SetVarValue(uiVariables["var_WindowScaleIndex"][1], config.general.windowScaleIndex);
+            imgui.SetVarValue(uiVariables["var_ShowDetailedYields"][1], config.general.showDetailedYields);
+            imgui.SetVarValue(uiVariables["var_UseImageButtons"][1], config.general.useImageButtons);
             imgui.SetVarValue(uiVariables["var_EnableSoundAlerts"][1], true);
             imgui.SetVarValue(uiVariables["var_AutoGenReports"][1], true);
-            local r, g, b, a = colorToRGBA(settings.general.yieldDetailsColor);
+            local r, g, b, a = colorToRGBA(config.general.yieldDetailsColor);
             imgui.SetVarValue(uiVariables["var_YieldDetailsColor"][1], r/255, g/255, b/255, a/255);
         end
         --imgui.PopStyleColor();
@@ -2037,11 +2032,11 @@ function renderSettingsGeneral()
 
         -- Opacity
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Current alpha channel value of all Yield windows.", settings.general.showToolTips) then
+        if imguiShowToolTip("Current alpha channel value of all Yield windows.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         if (imgui.SliderFloat("Window Opacity", uiVariables['var_WindowOpacity'][1], 0.25, 1.0, "%1.2f")) then
-            settings.general.opacity = imgui.GetVarValue(uiVariables['var_WindowOpacity'][1])
+            config.general.opacity = imgui.GetVarValue(uiVariables['var_WindowOpacity'][1])
         end
         -- /Opacity
 
@@ -2049,11 +2044,11 @@ function renderSettingsGeneral()
 
         -- Scale
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Current size for all Yield windows.", settings.general.showToolTips) then
+        if imguiShowToolTip("Current size for all Yield windows.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         if imgui.Combo("Window Size", uiVariables['var_WindowScaleIndex'][1], "Small\0Medium\0Large\0\0") then
-            settings.general.windowScaleIndex = imgui.GetVarValue(uiVariables['var_WindowScaleIndex'][1]);
+            config.general.windowScaleIndex = imgui.GetVarValue(uiVariables['var_WindowScaleIndex'][1]);
         end
         -- /Scale
 
@@ -2065,11 +2060,11 @@ function renderSettingsGeneral()
 
         -- Target Value
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Amount you would like to earn this session (affects progress bar).", settings.general.showToolTips) then
+        if imguiShowToolTip("Amount you would like to earn this session (affects progress bar).", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         if (imgui.InputInt("Target Value", uiVariables['var_TargetValue'][1])) then
-            settings.general.targetValue = imgui.GetVarValue(uiVariables['var_TargetValue'][1]);
+            config.general.targetValue = imgui.GetVarValue(uiVariables['var_TargetValue'][1]);
         end
         -- /Target Value
 
@@ -2077,7 +2072,7 @@ function renderSettingsGeneral()
 
         -- Target Sound
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Sound that will be played when you reach your target value (will only play if your target is reached through gathering).", settings.general.showToolTips) then
+        if imguiShowToolTip("Sound that will be played when you reach your target value (will only play if your target is reached through gathering).", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         if imgui.Button("Play") then
@@ -2085,12 +2080,12 @@ function renderSettingsGeneral()
         if imgui.IsItemClicked() then
             local soundFile = imgui.GetVarValue(uiVariables["var_TargetSoundFile"][1]);
             if soundFile ~= "" then
-                ashita.misc.play_sound(string.format(_addon.path.."sounds\\%s", soundFile));
+                ashita.misc.play_sound(string.format(addon.path.."sounds\\%s", soundFile));
             end
         end
         imgui.SameLine();
         local scaledWidths ={ [0] = 232, [1] = 268, [2] = 304 };
-        imgui.PushItemWidth(scaledWidths[settings.general.windowScaleIndex]);
+        imgui.PushItemWidth(scaledWidths[config.general.windowScaleIndex]);
         if imgui.Combo("Target Alert", uiVariables["var_TargetSoundIndex"][1], getSoundOptions()) then
             local soundIndex = imgui.GetVarValue(uiVariables["var_TargetSoundIndex"][1]);
             local soundFile = sounds[soundIndex];
@@ -2102,11 +2097,11 @@ function renderSettingsGeneral()
 
         -- Detailed Yields
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Toggles the display of the math breakdown in the scrollable yields list.", settings.general.showToolTips) then
+        if imguiShowToolTip("Toggles the display of the math breakdown in the scrollable yields list.", config.general.showToolTips) then
             imgui.SameLine(0.0 , state.window.spaceToolTip);
         end
         if (imgui.Checkbox("Show Detailed Yields", uiVariables['var_ShowDetailedYields'][1])) then
-            settings.general.showDetailedYields = imgui.GetVarValue(uiVariables['var_ShowDetailedYields'][1]);
+            config.general.showDetailedYields = imgui.GetVarValue(uiVariables['var_ShowDetailedYields'][1]);
         end
         -- /Detailed Yields
 
@@ -2114,13 +2109,13 @@ function renderSettingsGeneral()
 
         -- Yield Details Color
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Set the color of the math breakdown in the scrollable yields list.", settings.general.showToolTips) then
+        if imguiShowToolTip("Set the color of the math breakdown in the scrollable yields list.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
-        local r, g, b, a = colorToRGBA(settings.general.yieldDetailsColor);
+        local r, g, b, a = colorToRGBA(config.general.yieldDetailsColor);
 
         if imgui.ColorEdit4("Yield Details Color", uiVariables["var_YieldDetailsColor"][1]) then
-            settings.general.yieldDetailsColor = colorTableToInt(imgui.GetVarValue(uiVariables["var_YieldDetailsColor"][1]));
+            config.general.yieldDetailsColor = colorTableToInt(imgui.GetVarValue(uiVariables["var_YieldDetailsColor"][1]));
         end
         -- /Yield Details Color
 
@@ -2128,21 +2123,21 @@ function renderSettingsGeneral()
 
         -- Sound Alerts
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Toggles the set sound alerts for incoming yields.", settings.general.showToolTips) then
+        if imguiShowToolTip("Toggles the set sound alerts for incoming yields.", config.general.showToolTips) then
             imgui.SameLine(0.0 , state.window.spaceToolTip);
         end
         if (imgui.Checkbox("Enable Sound Alerts", uiVariables['var_EnableSoundAlerts'][1])) then
-            settings.general.enableSoundAlerts = imgui.GetVarValue(uiVariables['var_EnableSoundAlerts'][1]);
+            config.general.enableSoundAlerts = imgui.GetVarValue(uiVariables['var_EnableSoundAlerts'][1]);
         end
         -- /Sound Alerts
 
         -- Reports
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Toggles automatic report generation when zoning or after a data reset (you may still manually generate a report regardless).", settings.general.showToolTips) then
+        if imguiShowToolTip("Toggles automatic report generation when zoning or after a data reset (you may still manually generate a report regardless).", config.general.showToolTips) then
             imgui.SameLine(0.0 , state.window.spaceToolTip);
         end
         if (imgui.Checkbox("Auto Generate Reports", uiVariables['var_AutoGenReports'][1])) then
-            settings.general.autoGenReports = imgui.GetVarValue(uiVariables['var_AutoGenReports'][1]);
+            config.general.autoGenReports = imgui.GetVarValue(uiVariables['var_AutoGenReports'][1]);
         end
         -- /Reports
 
@@ -2154,21 +2149,21 @@ function renderSettingsGeneral()
 
         -- Image Buttons
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Toggles the display of images used for all gathering buttons. If off, text will be used instead.", settings.general.showToolTips) then
+        if imguiShowToolTip("Toggles the display of images used for all gathering buttons. If off, text will be used instead.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         if (imgui.Checkbox('Use Image Buttons', uiVariables["var_UseImageButtons"][1])) then
-            settings.general.useImageButtons = imgui.GetVarValue(uiVariables["var_UseImageButtons"][1]);
+            config.general.useImageButtons = imgui.GetVarValue(uiVariables["var_UseImageButtons"][1]);
         end
         -- /Image Buttons
 
         -- Tooltips
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Toggles the display of (?)s and their tooltips.", settings.general.showToolTips) then
+        if imguiShowToolTip("Toggles the display of (?)s and their tooltips.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         if (imgui.Checkbox('Show (?) Tooltips', uiVariables['var_ShowToolTips'][1])) then
-            settings.general.showToolTips = imgui.GetVarValue(uiVariables['var_ShowToolTips'][1]);
+            config.general.showToolTips = imgui.GetVarValue(uiVariables['var_ShowToolTips'][1]);
         end
         -- /Tooltips
         imgui.PopItemWidth();
@@ -2192,7 +2187,7 @@ function renderSettingsSetPrices()
                 state.settings.setPrices.gathering = data.name;
             end
             for _, data in ipairs(gatherTypes) do
-                if state.values.btnTextureFailure or not settings.general.useImageButtons then
+                if state.values.btnTextureFailure or not config.general.useImageButtons then
                     imguiPushActiveBtnColor(data.name == gathering);
                     if imgui.SmallButton(string.upperfirst(data.short)) then
                         btnAction(data);
@@ -2215,19 +2210,19 @@ function renderSettingsSetPrices()
 
             -- Defaults
             local spacePriceDefaults = state.window.spacePriceDefaults;
-            if settings.general.showToolTips then
+            if config.general.showToolTips then
                 spacePriceDefaults = spacePriceDefaults - ( imgui.GetFontSize() * 24 / defaultFontSize );
                 if state.window.scale > 1.0 then spacePriceDefaults = spacePriceDefaults + 2 end;
             end
             imgui.SameLine(0.0, spacePriceDefaults);
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip(string.format("Set all %s prices to their default values (0).", string.upperfirst(gathering)), settings.general.showToolTips) then
+            if imguiShowToolTip(string.format("Set all %s prices to their default values (0).", string.upperfirst(gathering)), config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             if imgui.SmallButton("Defaults", uiVariables[string.format("var_%s_priceMode", gathering)][1], 2) then
-                for yield, data in pairs(settings.yields[gathering], true) do
-                    settings.yields[gathering][yield].singlePrice = 0;
-                    settings.yields[gathering][yield].stackPrice = 0;
+                for yield, data in pairs(config.yields[gathering], true) do
+                    config.yields[gathering][yield].singlePrice = 0;
+                    config.yields[gathering][yield].stackPrice = 0;
                     imgui.SetVarValue(uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1], 0, 0);
                 end
                 imgui.SetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1], 0);
@@ -2249,34 +2244,34 @@ function renderSettingsSetPrices()
             imgui.SetCursorPosY(imgui.GetCursorPosY() + cursorOffsetY);
             --imgui.SetCursorPosX(imgui.GetCursorPosX() + 10.0);
 
-            if imguiShowToolTip("Use the set single-item prices for calculations.", settings.general.showToolTips) then
+            if imguiShowToolTip("Use the set single-item prices for calculations.", config.general.showToolTips) then
                 imgui.SameLine(0.0, 0.0);
             end
             if imgui.RadioButton("Single Prices", uiVariables[string.format("var_%s_priceMode", gathering)][1], 1) then
-                settings.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
+                config.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
             end
             imgui.NextColumn();
             imgui.SetCursorPosY(imgui.GetCursorPosY() + cursorOffsetY);
             imgui.SetCursorPosX(imgui.GetCursorPosX() - 5.0);
             imgui.SetColumnOffset(2, state.window.offsetPriceColumns2);
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip("Use the set stack prices for calculations (Yield will do the math for you).", settings.general.showToolTips) then
+            if imguiShowToolTip("Use the set stack prices for calculations (Yield will do the math for you).", config.general.showToolTips) then
                 imgui.SameLine(0.0, 0.0);
             end
             if imgui.RadioButton("Stack Prices", uiVariables[string.format("var_%s_priceMode", gathering)][1], 0) then
-                settings.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
+                config.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
             end
             imgui.NextColumn();
             -- NPC prices
             local spacePriceMode = state.window.spacePriceModeRadio;
-            if settings.general.showToolTips then spacePriceMode = 6.0 end
+            if config.general.showToolTips then spacePriceMode = 6.0 end
             imgui.SameLine(0.0, spacePriceMode);
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip(string.format("Use NPC base prices (Yield will automatically fetch the NPC single item prices as you gather). This option will override your set prices without modifying them.", string.upperfirst(gathering)), settings.general.showToolTips) then
+            if imguiShowToolTip(string.format("Use NPC base prices (Yield will automatically fetch the NPC single item prices as you gather). This option will override your set prices without modifying them.", string.upperfirst(gathering)), config.general.showToolTips) then
                 imgui.SameLine(0.0, 0.0);
             end
             if imgui.RadioButton("NPC prices", uiVariables[string.format("var_%s_priceMode", gathering)][1], 2) then
-                settings.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
+                config.priceModes[gathering] = imgui.GetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1]);
             end
             -- /NPC prices
 
@@ -2287,23 +2282,23 @@ function renderSettingsSetPrices()
         imgui.Separator();
         if imgui.BeginChild("Scrolling", -1, -1) then
             imgui.SetWindowFontScale(state.window.scale);
-            for i, yield in pairs(table.sortKeysByAlphabet(settings.yields[gathering], true)) do
-                local data = settings.yields[gathering][yield];
+            for i, yield in pairs(table.sortKeysByAlphabet(config.yields[gathering], true)) do
+                local data = config.yields[gathering][yield];
                  if data.id ~= nil then
                     imgui.AlignFirstTextHeightToWidgets();
-                    if imguiShowToolTip(string.format("Set the single-item and or stack prices for %s.", yield), settings.general.showToolTips) then
+                    if imguiShowToolTip(string.format("Set the single-item and or stack prices for %s.", yield), config.general.showToolTips) then
                         imgui.SameLine(0.0, state.window.spaceToolTip);
                     end
                     imgui.PushItemWidth(state.window.widthWidgetDefault);
                     local adjItemName = data.short or yield;
-                     local disabled = settings.priceModes[gathering] == 2;
+                     local disabled = config.priceModes[gathering] == 2;
                      imguiPushDisabled(disabled);
                      local flags = 0;
                      if disabled then flags = ImGuiInputTextFlags_ReadOnly; end
                      if imgui.InputInt2(adjItemName, uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1], imgui.bor(flags)) then
                          local prices = imgui.GetVarValue(uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1]);
-                         settings.yields[gathering][yield].singlePrice = prices[1];
-                         settings.yields[gathering][yield].stackPrice = prices[2];
+                         config.yields[gathering][yield].singlePrice = prices[1];
+                         config.yields[gathering][yield].stackPrice = prices[2];
                      end
                     imgui.PopItemWidth();
                     imguiPopDisabled(disabled);
@@ -2330,7 +2325,7 @@ function renderSettingsSetColors()
                 imgui.SetVarValue(uiVariables["var_AllColors"][1], r/255, g/255, b/255, a/255);
             end
             for _, data in ipairs(gatherTypes) do
-                if state.values.btnTextureFailure or not settings.general.useImageButtons then
+                if state.values.btnTextureFailure or not config.general.useImageButtons then
                     imguiPushActiveBtnColor(data.name == gathering);
                     if imgui.SmallButton(string.upperfirst(data.short)) then
                         btnAction(data);
@@ -2351,18 +2346,18 @@ function renderSettingsSetColors()
             end
             -- Defaults
             local spaceColorDefaults = state.window.spaceColorDefaults;
-            if settings.general.showToolTips then
+            if config.general.showToolTips then
                 spaceColorDefaults = spaceColorDefaults - ( imgui.GetFontSize() * 24 / defaultFontSize );
                 if state.window.scale > 1.0 then spaceColorDefaults = spaceColorDefaults + 2 end;
             end
             imgui.SameLine(0.0, spaceColorDefaults);
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip(string.format("Set all %s yield colors to their defaults.", string.upperfirst(gathering)), settings.general.showToolTips) then
+            if imguiShowToolTip(string.format("Set all %s yield colors to their defaults.", string.upperfirst(gathering)), config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             if imgui.SmallButton("Defaults") then
-                for yield, data in pairs(settings.yields[gathering]) do
-                    settings.yields[gathering][yield].color = -3877684 -- plain
+                for yield, data in pairs(config.yields[gathering]) do
+                    config.yields[gathering][yield].color = -3877684 -- plain
                     local r, g, b, a = colorToRGBA(-3877684);
                     imgui.SetVarValue(uiVariables[string.format("var_%s_%s_color", gathering, yield)][1], r/255, g/255, b/255, a/255);
                     imgui.SetVarValue(uiVariables["var_AllColors"][1], r/255, g/255, b/255, a/255);
@@ -2373,33 +2368,33 @@ function renderSettingsSetColors()
         end
         -- All
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Set the text color for all yields when they are displayed in the yield list.", settings.general.showToolTips) then
+        if imguiShowToolTip("Set the text color for all yields when they are displayed in the yield list.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         local scaledWidths ={ [0] = 275, [1] = 318, [2] = 364 };
         imgui.PushItemWidth(state.window.widthWidgetDefault);
         if imgui.ColorEdit4("Set All", uiVariables["var_AllColors"][1]) then
             local color = imgui.GetVarValue(uiVariables["var_AllColors"][1]);
-            for yield, data in pairs(settings.yields[gathering]) do
+            for yield, data in pairs(config.yields[gathering]) do
                 imgui.SetVarValue(uiVariables[string.format("var_%s_%s_color", gathering, yield)][1], color[1], color[2], color[3], color[4]);
-                settings.yields[gathering][yield].color = colorTableToInt(imgui.GetVarValue(uiVariables[string.format("var_%s_%s_color", gathering, yield)][1]));
+                config.yields[gathering][yield].color = colorTableToInt(imgui.GetVarValue(uiVariables[string.format("var_%s_%s_color", gathering, yield)][1]));
             end
         end
         imgui.PopItemWidth();
         -- All
         imgui.Separator();
-        for data, yield in pairs(table.sortKeysByAlphabet(settings.yields[gathering], true)) do
+        for data, yield in pairs(table.sortKeysByAlphabet(config.yields[gathering], true)) do
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip(string.format("Set the text color for %s when its displayed in the yield list.", yield), settings.general.showToolTips) then
+            if imguiShowToolTip(string.format("Set the text color for %s when its displayed in the yield list.", yield), config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
-            local r, g, b, a = colorToRGBA(settings.yields[gathering][yield].color);
+            local r, g, b, a = colorToRGBA(config.yields[gathering][yield].color);
             imgui.PushStyleColor(ImGuiCol_Text, r/255, g/255, b/255, a/255);
             imgui.PushItemWidth(state.window.widthWidgetDefault);
-            local shortName = settings.yields[gathering][yield].short;
+            local shortName = config.yields[gathering][yield].short;
             local adjItemName = shortName or yield;
             if (imgui.ColorEdit4(adjItemName, uiVariables[string.format("var_%s_%s_color", gathering, yield)][1])) then
-                settings.yields[gathering][yield].color = colorTableToInt(imgui.GetVarValue(uiVariables[string.format("var_%s_%s_color", gathering, yield)][1]));
+                config.yields[gathering][yield].color = colorTableToInt(imgui.GetVarValue(uiVariables[string.format("var_%s_%s_color", gathering, yield)][1]));
             end
             imgui.PopStyleColor();
             imgui.PopItemWidth();
@@ -2422,7 +2417,7 @@ function renderSettingsSetAlerts()
                 imgui.SetVarValue(uiVariables["var_AllSoundIndex"][1], 0);
             end
             for _, data in ipairs(gatherTypes) do
-            if state.values.btnTextureFailure or not settings.general.useImageButtons then
+            if state.values.btnTextureFailure or not config.general.useImageButtons then
                 imguiPushActiveBtnColor(data.name == gathering);
                 if imgui.SmallButton(string.upperfirst(data.short)) then
                     btnAction(data);
@@ -2443,18 +2438,18 @@ function renderSettingsSetAlerts()
             end
             -- Defaults
             local spaceColorDefaults = state.window.spaceColorDefaults;
-            if settings.general.showToolTips then
+            if config.general.showToolTips then
                 spaceColorDefaults = spaceColorDefaults - ( imgui.GetFontSize() * 24 / defaultFontSize );
                 if state.window.scale > 1.0 then spaceColorDefaults = spaceColorDefaults + 2 end;
             end
             imgui.SameLine(0.0, spaceColorDefaults);
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip(string.format("Set all %s yield colors to their defaults.", string.upperfirst(gathering)), settings.general.showToolTips) then
+            if imguiShowToolTip(string.format("Set all %s yield colors to their defaults.", string.upperfirst(gathering)), config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             if imgui.SmallButton("Defaults") then
-                for yield, data in pairs(settings.yields[gathering]) do
-                    settings.yields[gathering][yield].soundIndex = 0
+                for yield, data in pairs(config.yields[gathering]) do
+                    config.yields[gathering][yield].soundIndex = 0
                     imgui.SetVarValue(uiVariables[string.format("var_%s_%s_soundFile", gathering, yield)][1], "");
                     imgui.SetVarValue(uiVariables[string.format("var_%s_%s_soundIndex", gathering, yield)][1], 0);
                     imgui.SetVarValue(uiVariables["var_AllSoundIndex"][1], 0);
@@ -2473,15 +2468,15 @@ function renderSettingsSetAlerts()
         end
         -- All
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Set a sound alert for all yields.", settings.general.showToolTips) then
+        if imguiShowToolTip("Set a sound alert for all yields.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         local scaledWidths ={ [0] = 273, [1] = 318, [2] = 364 };
-        imgui.PushItemWidth(scaledWidths[settings.general.windowScaleIndex]);
+        imgui.PushItemWidth(scaledWidths[config.general.windowScaleIndex]);
         if imgui.Combo("Set All", uiVariables["var_AllSoundIndex"][1], getSoundOptions()) then
             local soundIndex = imgui.GetVarValue(uiVariables["var_AllSoundIndex"][1]);
             local soundFile = sounds[soundIndex];
-            for yield, data in pairs(settings.yields[gathering]) do
+            for yield, data in pairs(config.yields[gathering]) do
                 imgui.SetVarValue(uiVariables[string.format("var_%s_%s_soundIndex", gathering, yield)][1], soundIndex);
                 imgui.SetVarValue(uiVariables[string.format("var_%s_%s_soundFile", gathering, yield)][1], "");
                 imgui.SetVarValue(uiVariables[string.format("var_%s_%s_soundFile", gathering, yield)][1], soundFile);
@@ -2505,14 +2500,14 @@ function renderSettingsSetAlerts()
         --  Fishing Skillup
         if gathering == "fishing" then
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip("Set a sound alert for when you receive a fishing skill-up.", settings.general.showToolTips) then
+            if imguiShowToolTip("Set a sound alert for when you receive a fishing skill-up.", config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             if imgui.Button("Play") then end
             if imgui.IsItemClicked() then
                 local soundFile = imgui.GetVarValue(uiVariables["var_FishingSkillSoundFile"][1]);
                 if soundFile ~= "" then
-                    ashita.misc.play_sound(string.format(_addon.path.."sounds\\%s", soundFile));
+                    ashita.misc.play_sound(string.format(addon.path.."sounds\\%s", soundFile));
                 end
             end
             imgui.SameLine();
@@ -2531,14 +2526,14 @@ function renderSettingsSetAlerts()
         -- Clamming break
         if gathering == "clamming" then
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip("Set a sound alert for when your clamming bucket breaks.", settings.general.showToolTips) then
+            if imguiShowToolTip("Set a sound alert for when your clamming bucket breaks.", config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             if imgui.Button("Play") then end
             if imgui.IsItemClicked() then
                 local soundFile = imgui.GetVarValue(uiVariables["var_ClamBreakSoundFile"][1]);
                 if soundFile ~= "" then
-                    ashita.misc.play_sound(string.format(_addon.path.."sounds\\%s", soundFile));
+                    ashita.misc.play_sound(string.format(addon.path.."sounds\\%s", soundFile));
                 end
             end
             imgui.SameLine();
@@ -2554,18 +2549,18 @@ function renderSettingsSetAlerts()
         end
         -- /Clamming break
 
-        for data, yield in pairs(table.sortKeysByAlphabet(settings.yields[gathering], true)) do
+        for data, yield in pairs(table.sortKeysByAlphabet(config.yields[gathering], true)) do
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip(string.format("Set a sound alert for %s when it enters the yields list.", yield), settings.general.showToolTips) then
+            if imguiShowToolTip(string.format("Set a sound alert for %s when it enters the yields list.", yield), config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
-            local shortName = settings.yields[gathering][yield].short;
+            local shortName = config.yields[gathering][yield].short;
             local adjItemName = shortName or yield;
             if imgui.Button("Play") then end
             if imgui.IsItemClicked() then
                 local soundFile = imgui.GetVarValue(uiVariables[string.format("var_%s_%s_soundFile", gathering, yield)][1]);
                 if soundFile ~= "" then
-                    ashita.misc.play_sound(string.format(_addon.path.."sounds\\%s", soundFile));
+                    ashita.misc.play_sound(string.format(addon.path.."sounds\\%s", soundFile));
                 end
             end
             imgui.SameLine();
@@ -2599,7 +2594,7 @@ function renderSettingsReports()
                 state.values.currentReportName = nil;
             end
             for _, data in ipairs(gatherTypes) do
-            if state.values.btnTextureFailure or not settings.general.useImageButtons then
+            if state.values.btnTextureFailure or not config.general.useImageButtons then
                 imguiPushActiveBtnColor(data.name == gathering);
                 if imgui.SmallButton(string.upperfirst(data.short)) then
                     btnAction(data);
@@ -2620,13 +2615,13 @@ function renderSettingsReports()
             end
             -- Generate
             local spaceColorDefaults = state.window.spaceColorDefaults;
-            if settings.general.showToolTips then
+            if config.general.showToolTips then
                 spaceColorDefaults = spaceColorDefaults - ( imgui.GetFontSize() * 24 / defaultFontSize );
                 if state.window.scale > 1.0 then spaceColorDefaults = spaceColorDefaults + 2 end;
             end
             imgui.SameLine(0.0, spaceColorDefaults);
             imgui.AlignFirstTextHeightToWidgets();
-            if imguiShowToolTip(string.format("Manually generate a %s report using its current yield data.", string.upperfirst(gathering)), settings.general.showToolTips) then
+            if imguiShowToolTip(string.format("Manually generate a %s report using its current yield data.", string.upperfirst(gathering)), config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
             local disabled = imguiPushDisabled(state.values.genReportDisabled);
@@ -2635,7 +2630,7 @@ function renderSettingsReports()
                     state.values.currentReportName = nil
                     if generateGatheringReport(gathering) then
                         state.values.genReportDisabled = true;
-                        ashita.timer.once(2, function()
+                        ashita.tasks.once(2, function()
                             state.values.genReportDisabled = false;
                         end);
                     end
@@ -2682,7 +2677,7 @@ function renderSettingsReports()
 
         imgui.Separator();
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Read the selected report within the view window below (or double-click on the file name to perform this action).", settings.general.showToolTips) then
+        if imguiShowToolTip("Read the selected report within the view window below (or double-click on the file name to perform this action).", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         local disabled = imguiPushDisabled(imgui.GetVarValue(uiVariables["var_ReportSelected"][1]) == 0);
@@ -2696,7 +2691,7 @@ function renderSettingsReports()
         imguiPopDisabled(disabled);
         imgui.SameLine(0.0, state.window.spaceSettingsBtn * 2);
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Clear the selection window above and the report view window below.", settings.general.showToolTips) then
+        if imguiShowToolTip("Clear the selection window above and the report view window below.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         disabled = imguiPushDisabled(imgui.GetVarValue(uiVariables["var_ReportSelected"][1]) == 0);
@@ -2708,7 +2703,7 @@ function renderSettingsReports()
 
         imgui.SameLine(0.0, state.window.spaceSettingsBtn * 2);
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Adjust the font scale of the report.", settings.general.showToolTips) then
+        if imguiShowToolTip("Adjust the font scale of the report.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         imgui.PushItemWidth(state.window.widthReportScale);
@@ -2717,8 +2712,8 @@ function renderSettingsReports()
         imgui.SameLine();
 
         local spaceReportsDeleteMap = {[0] = state.window.spaceReportsDelete, [1] = state.window.spaceReportsDelete - 5, [2] = state.window.spaceReportsDelete - 8};
-        local spaceReportsDelete = spaceReportsDeleteMap[settings.general.windowScaleIndex]
-        if settings.general.showToolTips then
+        local spaceReportsDelete = spaceReportsDeleteMap[config.general.windowScaleIndex]
+        if config.general.showToolTips then
             spaceReportsDelete = spaceReportsDelete - ( (imgui.GetFontSize() * 24) * 4 / defaultFontSize );
             if state.window.scale > 1.0 then spaceReportsDelete = spaceReportsDelete + 2 end;
         end
@@ -2727,7 +2722,7 @@ function renderSettingsReports()
 
         local disabled = imguiPushDisabled(imgui.GetVarValue(uiVariables["var_ReportSelected"][1]) == 0);
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Delete the selected report entry.", settings.general.showToolTips) then
+        if imguiShowToolTip("Delete the selected report entry.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
 
@@ -2736,7 +2731,7 @@ function renderSettingsReports()
                 local selectedIndex = imgui.GetVarValue(uiVariables["var_ReportSelected"][1]);
                 local fname = sortedReports[selectedIndex];
                 if fname ~= nil then
-                    local fpath = string.format('%s/%s/%s/%s/%s', _addon.path, 'reports', getPlayerName(), gathering, fname);
+                    local fpath = string.format('%s/%s/%s/%s/%s', addon.path, 'reports', getPlayerName(), gathering, fname);
                     os.remove(fpath);
                     for _, fileName in ipairs(reports[gathering]) do
                         if fileName == fname then
@@ -2761,7 +2756,7 @@ function renderSettingsReports()
             local fname = state.values.currentReportName;
             if fname ~= nil then
                 if getPlayerName() ~= "" then
-                    local fpath = string.format('%s/%s/%s/%s/%s', _addon.path, 'reports', getPlayerName(), gathering, fname);
+                    local fpath = string.format('%s/%s/%s/%s/%s', addon.path, 'reports', getPlayerName(), gathering, fname);
                     local lines = linesFrom(fpath);
                     if table.count(lines) > 0 then
                         for _, line in pairs(lines) do
@@ -2816,19 +2811,19 @@ function renderSettingsFeedback()
         imgui.Text("If you have discovered a problem or want to provide some feedback you can do so here anonymously!")
         local widgetWidth = state.window.widthWidgetDefault+75
         local centerWidget = imgui.GetWindowContentRegionWidth()/2 - widgetWidth/2
-        if settings.general.showToolTips then centerWidget = centerWidget - ( imgui.GetFontSize() * 24 / defaultFontSize ); end
+        if config.general.showToolTips then centerWidget = centerWidget - ( imgui.GetFontSize() * 24 / defaultFontSize ); end
         imgui.SetCursorPosY(imgui.GetWindowHeight() / 5);
         imgui.SetCursorPosX(centerWidget);
         imgui.AlignFirstTextHeightToWidgets();
         imgui.PushItemWidth(widgetWidth);
-        if imguiShowToolTip("Enter a title for your feedback/issue submission.", settings.general.showToolTips) then
+        if imguiShowToolTip("Enter a title for your feedback/issue submission.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         imgui.InputText('Title', uiVariables['var_IssueTitle'][1], 128, imgui.bor(ImGuiInputTextFlags_EnterReturnsTrue));
         imgui.Spacing();
         imgui.SetCursorPosX(centerWidget);
         imgui.AlignFirstTextHeightToWidgets();
-        if imguiShowToolTip("Enter your feedback/issue.", settings.general.showToolTips) then
+        if imguiShowToolTip("Enter your feedback/issue.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         imgui.InputTextMultiline('Body', uiVariables['var_IssueBody'][1], 16384, state.window.widthWidgetDefault+75, imgui.GetTextLineHeight() * 16, imgui.bor(ImGuiInputTextFlags_AllowTabInput, ImGuiInputTextFlags_EnterReturnsTrue));
@@ -2864,7 +2859,7 @@ function renderSettingsFeedback()
         end
         imgui.PushTextWrapPos(imgui.GetWindowContentRegionWidth());
         imgui.SetCursorPosY(imgui.GetWindowHeight()-imgui.GetTextLineHeight()*2);
-        if imguiShowToolTip("All submissions are anonymous and will go to LoTekkie's github issue tracker for Ashita-Yield.", settings.general.showToolTips) then
+        if imguiShowToolTip("All submissions are anonymous and will go to LoTekkie's github issue tracker for Ashita-Yield.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         imgui.Text("* To: https://github.com/LoTekkie/Ashita-Yield/issues.");
@@ -2882,13 +2877,13 @@ function renderSettingsAbout()
         imgui.SetWindowFontScale(state.window.scale);
         imgui.Spacing();
         imgui.PushTextWrapPos(imgui.GetContentRegionAvailWidth());
-        imgui.TextColored(1, 1, 0.54, 1, "Name:"); imgui.Text(string.format("%s by Lotekkie & Narpt", _addon.name));
+        imgui.TextColored(1, 1, 0.54, 1, "Name:"); imgui.Text(string.format("%s by Lotekkie & Narpt", addon.name));
         imgui.Spacing();
-        imgui.TextColored(1, 1, 0.54, 1, "Description:"); imgui.Text(_addon.description); imgui.Text("https://github.com/LoTekkie/Ashita-Yield");
+        imgui.TextColored(1, 1, 0.54, 1, "Description:"); imgui.Text(addon.description); imgui.Text("https://github.com/LoTekkie/Ashita-Yield");
         imgui.Spacing();
-        imgui.TextColored(1, 1, 0.54, 1, "Author:"); imgui.Text(_addon.author);
+        imgui.TextColored(1, 1, 0.54, 1, "Author:"); imgui.Text(addon.author);
         imgui.Spacing();
-        imgui.TextColored(1, 1, 0.54, 1, "Version:"); imgui.Text(_addon.version);
+        imgui.TextColored(1, 1, 0.54, 1, "Version:"); imgui.Text(addon.version);
         imgui.Spacing();
         imgui.TextColored(1, 1, 0.54, 1, "Support/Donate:"); imgui.Text("https://Paypal.me/Sjshovan\nOR\nFor Gil donations: I play on Wings private server! (https://www.wingsxi.com/wings/) My in-game name is LoTekkie.");
         imgui.Spacing();
