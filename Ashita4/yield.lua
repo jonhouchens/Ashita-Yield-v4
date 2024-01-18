@@ -40,6 +40,7 @@ require 'common';
 require 'ffxi.enums';
 require 'ffxi.vanatime';
 
+local bit = require 'bit';
 local templates = require 'templates';
 local imgui = require 'imgui';
 local settings = require 'settings';
@@ -713,17 +714,17 @@ end
 ----------------------------------------------------------------------------------------------------
 function saveSettings()
     -- Obtain the configuration variables..
-    config.general.opacity               = imgui.GetVarValue(uiVariables["var_WindowOpacity"][1]);
-    config.general.targetValue           = imgui.GetVarValue(uiVariables["var_TargetValue"][1]);
-    config.general.showToolTips          = imgui.GetVarValue(uiVariables["var_ShowToolTips"][1]);
-    config.general.windowScaleIndex      = imgui.GetVarValue(uiVariables["var_WindowScaleIndex"][1]);
-    config.general.yieldDetailsColor     = colorTableToInt(imgui.GetVarValue(uiVariables["var_YieldDetailsColor"][1]));
-    config.general.useImageButtons       = imgui.GetVarValue(uiVariables["var_UseImageButtons"][1]);
-    config.general.enableSoundAlerts     = imgui.GetVarValue(uiVariables["var_EnableSoundAlerts"][1]);
-    config.general.targetSoundFile       = imgui.GetVarValue(uiVariables["var_TargetSoundFile"][1]);
-    config.general.fishingSkillSoundFile = imgui.GetVarValue(uiVariables["var_FishingSkillSoundFile"][1]);
-    config.general.clamBreakSoundFile    = imgui.GetVarValue(uiVariables["var_ClamBreakSoundFile"][1]);
-    config.general.autoGenReports        = imgui.GetVarValue(uiVariables["var_AutoGenReports"][1]);
+    -- config.general.opacity               = imgui.GetVarValue(uiVariables["var_WindowOpacity"][1]);
+    -- config.general.targetValue           = imgui.GetVarValue(uiVariables["var_TargetValue"][1]);
+    -- config.general.showToolTips          = imgui.GetVarValue(uiVariables["var_ShowToolTips"][1]);
+    -- config.general.windowScaleIndex      = imgui.GetVarValue(uiVariables["var_WindowScaleIndex"][1]);
+    -- config.general.yieldDetailsColor     = colorTableToInt(imgui.GetVarValue(uiVariables["var_YieldDetailsColor"][1]));
+    -- config.general.useImageButtons       = imgui.GetVarValue(uiVariables["var_UseImageButtons"][1]);
+    -- config.general.enableSoundAlerts     = imgui.GetVarValue(uiVariables["var_EnableSoundAlerts"][1]);
+    -- config.general.targetSoundFile       = imgui.GetVarValue(uiVariables["var_TargetSoundFile"][1]);
+    -- config.general.fishingSkillSoundFile = imgui.GetVarValue(uiVariables["var_FishingSkillSoundFile"][1]);
+    -- config.general.clamBreakSoundFile    = imgui.GetVarValue(uiVariables["var_ClamBreakSoundFile"][1]);
+    -- config.general.autoGenReports        = imgui.GetVarValue(uiVariables["var_AutoGenReports"][1]);
 
     for gathering, yields in pairs(config.yields) do
         for yield, data in pairs(yields) do
@@ -1193,7 +1194,7 @@ local SettingsWindow =
             imgui.SetNextWindowPosCenter(1);
             state.values.centerWindow = false;
         end
-        if (not imgui.Begin(title, uiVariables["var_SettingsVisible"][1], imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize))) then
+        if (not imgui.Begin(title, uiVariables["var_SettingsVisible"][1], bit.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize))) then
             imgui.End();
             return;
         end
@@ -1281,12 +1282,12 @@ local helpWindow =
     Draw = function (self, title)
         local scaledHeightReduction = 0;
         if state.window.scale == 1.15 then scaledHeightReduction = 7 elseif state.window.scale == 1.30 then scaledHeightReduction = 12 end;
-        imgui.SetNextWindowSize(state.window.widthSettings, state.window.heightSettings - scaledHeightReduction, ImGuiSetCond_Always);
+        imgui.SetNextWindowSize({ state.window.widthSettings, state.window.heightSettings - scaledHeightReduction }, ImGuiSetCond_Always);
         if state.values.centerWindow then
-            imgui.SetNextWindowPosCenter(1);
+            -- imgui.SetNextWindowPosCenter(1);
             state.values.centerWindow = false;
         end
-        if (not imgui.Begin(title, uiVariables["var_HelpVisible"][1], imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize))) then
+        if (not imgui.Begin(title, config.imgui.helpVisible, bit.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize))) then
             imgui.End();
             return;
         end
@@ -1318,15 +1319,15 @@ local helpWindow =
         imgui.Spacing();
 
         if imgui.Button("Done") then
-            imgui.SetVarValue(uiVariables["var_HelpVisible"][1], false);
+            config.imgui.helpVisible[1] = false;
         end
 
         imgui.SameLine();
         imgui.Text("OR close window to exit.");
 
         if state.initializing then
-            imgui.SetVarValue(uiVariables["var_SettingsVisible"][1], false);
-            imgui.SetVarValue(uiVariables["var_HelpVisible"][1], false);
+            config.imgui.settingsVisible[1] = false;
+            config.imgui.helpVisible[1] = false;
             imgui.CloseCurrentPopup();
         end
 
@@ -1350,20 +1351,20 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     imgui.PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 5.0);
     imgui.PushStyleVar(ImGuiStyleVar_Alpha, config.general.opacity);
     imgui.PushStyleVar(ImGuiStyleVar_WindowPadding, scaledFontSize*5/defaultFontSize, scaledFontSize*5/defaultFontSize);
-    imgui.PushStyleColor(ImGuiCol_Border, 0.21, 0.47, 0.59, 0.5);
-    imgui.PushStyleColor(ImGuiCol_PlotLines, 0.77, 0.83, 0.80, 0.3);
-    imgui.PushStyleColor(ImGuiCol_PlotHistogram, 0.77, 0.83, 0.80, 0.3);
-    imgui.PushStyleColor(ImGuiCol_TitleBgActive, 17/255, 17/255, 30/255, 1.0);
+    imgui.PushStyleColor(ImGuiCol_Border, { 0.21, 0.47, 0.59, 0.5 });
+    imgui.PushStyleColor(ImGuiCol_PlotLines, { 0.77, 0.83, 0.80, 0.3 });
+    imgui.PushStyleColor(ImGuiCol_PlotHistogram, { 0.77, 0.83, 0.80, 0.3 });
+    imgui.PushStyleColor(ImGuiCol_TitleBgActive, { 17/255, 17/255, 30/255, 1.0 });
 
     -- MAIN
-    imgui.SetNextWindowSize(scaledFontSize*250/defaultFontSize, scaledFontSize*500/defaultFontSize - scaledHeightReduction, ImGuiSetCond_Always);
+    imgui.SetNextWindowSize({ scaledFontSize*250/defaultFontSize, scaledFontSize*500/defaultFontSize - scaledHeightReduction }, ImGuiSetCond_Always);
     if state.initializing and state.firstLoad then
-        imgui.SetNextWindowPosCenter(1);
+        -- imgui.SetNextWindowPosCenter(1);
         state.values.centerWindow = true;
     elseif state.initializing then
-        imgui.SetNextWindowPos(state.window.posX , state.window.posY);
+        imgui.SetNextWindowPos({ state.window.posX, state.window.posY });
     end
-    if not imgui.Begin(string.format("%s v%s by Lotekkie & Narpt", addon.name, addon.version), imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
+    if not imgui.Begin(string.format("%s v%s by Lotekkie & Narpt", addon.name, addon.version), config.imgui.windowVisible, bit.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
         imgui.End();
         return
     end
@@ -1430,13 +1431,16 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
             updateAllStates(data.name);
             state.values.inactivitySeconds = 0;
             checkTargetAlertReady();
-            imgui.SetVarValue(uiVariables['var_ReportSelected'][1], nil);
+            config.imgui.reportSelected[1] = nil;
             state.values.currentReportName = nil;
             state.settings.setColors.gathering = data.name;
             local r, g, b, a = colorToRGBA(-3877684);
-            imgui.SetVarValue(uiVariables["var_AllColors"][1], r/255, g/255, b/255, a/255);
+            config.imgui.allColors[1] = r/255;
+            config.imgui.allColors[2] = g/255;
+            config.imgui.allColors[3] = b/255;
+            config.imgui.allColors[4] = a/255;
             state.settings.setAlerts.gathering = data.name;
-            imgui.SetVarValue(uiVariables["var_AllSoundIndex"][1], 0);
+            config.imgui.allSoundIndex[1] = 0;
         end
         for _, data in ipairs(gatherTypes) do
             if state.values.btnTextureFailure or not config.general.useImageButtons then
@@ -1468,18 +1472,18 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     if imguiShowToolTip(string.format("Progress towards your target value (adjusted within settings)."), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip)
     end
-    if imgui.BeginChild("Header", -1, state.window.heightHeaderMain) then
+    if imgui.BeginChild("Header", { -1, state.window.heightHeaderMain }) then
         imgui.SetWindowFontScale(state.window.scale);
         local progress = calcTargetProgress()
 
         if progress < 1 and progress >= 0.5 then
-            imgui.PushStyleColor(ImGuiCol_Text, 1, 1, 0.54, 1); -- warn
+            imgui.PushStyleColor(ImGuiCol_Text, { 1, 1, 0.54, 1 }); -- warn
         elseif progress < 0.5 then
-            imgui.PushStyleColor(ImGuiCol_Text, 1, 0.615, 0.615, 1); -- danger
+            imgui.PushStyleColor(ImGuiCol_Text, { 1, 0.615, 0.615, 1 }); -- danger
         else
-            imgui.PushStyleColor(ImGuiCol_Text, 0.39, 0.96, 0.13, 1); -- success
+            imgui.PushStyleColor(ImGuiCol_Text, { 0.39, 0.96, 0.13, 1 }); -- success
         end
-        imgui.ProgressBar(progress, -1, state.window.heightHeaderMain, string.format("%s/%s", metrics[state.gathering].estimatedValue, config.general.targetValue))
+        imgui.ProgressBar(progress, { -1, state.window.heightHeaderMain }, string.format("%s/%s", metrics[state.gathering].estimatedValue, config.general.targetValue))
         imgui.PopStyleColor();
         imgui.EndChild();
     end
@@ -1514,11 +1518,11 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
             end
             local pzDiff = state.values.clamBucketPzMax - state.values.clamBucketPz;
             if pzDiff <= 5 then
-                imgui.PushStyleColor(ImGuiCol_Text, 1, 0.615, 0.615, 1); -- danger
+                imgui.PushStyleColor(ImGuiCol_Text, { 1, 0.615, 0.615, 1 }); -- danger
             elseif pzDiff <= state.values.clamBucketPzMax/2 then
-                imgui.PushStyleColor(ImGuiCol_Text, 1, 1, 0.54, 1); -- warn
+                imgui.PushStyleColor(ImGuiCol_Text, { 1, 1, 0.54, 1 }); -- warn
             else
-                imgui.PushStyleColor(ImGuiCol_Text, 0.77, 0.83, 0.80, 1); -- plain
+                imgui.PushStyleColor(ImGuiCol_Text, { 0.77, 0.83, 0.80, 1 }); -- plain
             end
             imgui.Text(string.format("Bucket: %spz", state.values.clamBucketPz));
             imgui.PopStyleColor();
@@ -1539,12 +1543,12 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     if state.gathering == "clamming" then targetAvail = 1; end
 
     if avail < targetAvail then
-        imgui.PushStyleColor(ImGuiCol_Text, 1, 0.615, 0.615, 1); -- danger
+        imgui.PushStyleColor(ImGuiCol_Text, { 1, 0.615, 0.615, 1 }); -- danger
     else
         if state.gathering == "clamming" and state.values.clamBucketBroken then
-            imgui.PushStyleColor(ImGuiCol_Text, 1, 1, 0.54, 1); -- warn
+            imgui.PushStyleColor(ImGuiCol_Text, { 1, 1, 0.54, 1 }); -- warn
         else
-            imgui.PushStyleColor(ImGuiCol_Text, 0.77, 0.83, 0.80, 1); -- plain
+            imgui.PushStyleColor(ImGuiCol_Text, { 0.77, 0.83, 0.80, 1 }); -- plain
         end
     end
 
@@ -1574,11 +1578,11 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     local availPct = playerStorage['available_pct'];
     if state.values.zoning then availPct = state.values.preZoneCounts['available_pct']; end
     if availPct < 50 and availPct >= 25 then
-        imgui.PushStyleColor(ImGuiCol_Text, 1, 1, 0.54, 1); -- warn
+        imgui.PushStyleColor(ImGuiCol_Text, { 1, 1, 0.54, 1 }); -- warn
     elseif availPct < 25 then
-        imgui.PushStyleColor(ImGuiCol_Text, 1, 0.615, 0.615, 1); -- danger
+        imgui.PushStyleColor(ImGuiCol_Text, { 1, 0.615, 0.615, 1 }); -- danger
     else
-        imgui.PushStyleColor(ImGuiCol_Text, 0.77, 0.83, 0.80, 1); -- plain
+        imgui.PushStyleColor(ImGuiCol_Text, { 0.77, 0.83, 0.80, 1 }); -- plain
     end
     imgui.Text("Inventory:")
     imgui.SameLine();
@@ -1600,7 +1604,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     if state.timers[state.gathering] then
         r, g, b, a = 0.77, 0.83, 0.80, 1 -- plain
     end
-    imgui.TextColored(r, g, b, a, os.date("!%X", (metrics[state.gathering].secondsPassed)))
+    imgui.TextColored({ r, g, b, a }, os.date("!%X", (metrics[state.gathering].secondsPassed)))
     -- /time passed
 
     imgui.Spacing();
@@ -1629,7 +1633,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     imguiHalfSep();
     imgui.AlignFirstTextHeightToWidgets();
     -- value
-    imgui.PushStyleColor(ImGuiCol_Text, 0.39, 0.96, 0.13, 1); -- success
+    imgui.PushStyleColor(ImGuiCol_Text, { 0.39, 0.96, 0.13, 1 }); -- success
     if imguiShowToolTip(string.format("Editable estimated value of all %s yields (yield prices adjusted within settings).", string.upperfirst(state.gathering)), config.general.showToolTips) then
         imgui.SameLine(0.0, state.window.spaceToolTip);
     end
@@ -1643,8 +1647,8 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
 
     imgui.PushItemWidth(-1);
     imgui.PushAllowKeyboardFocus(false);
-    if (imgui.InputInt('', uiVariables[string.format("var_%s_estimatedValue", state.gathering)][1])) then
-        metrics[state.gathering].estimatedValue = imgui.GetVarValue(uiVariables[string.format("var_%s_estimatedValue", state.gathering)][1]);
+    if (imgui.InputInt('', config.imgui.estValues[state.gathering])) then
+        metrics[state.gathering].estimatedValue = config.imgui.estValues[state.gathering];
         checkTargetAlertReady();
     end
     imgui.PopStyleColor();
@@ -1674,14 +1678,14 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     if state.gathering == "fishing" then targetYields = 90; end
 
     if yieldsPerHour < targetYields and yieldsPerHour >= targetYields/2 then
-        imgui.PushStyleColor(ImGuiCol_Text, 1, 1, 0.54, 1); -- warn
+        imgui.PushStyleColor(ImGuiCol_Text, { 1, 1, 0.54, 1 }); -- warn
     elseif yieldsPerHour < targetYields/2 then
-        imgui.PushStyleColor(ImGuiCol_Text, 1, 0.615, 0.615, 1); -- danger
+        imgui.PushStyleColor(ImGuiCol_Text, { 1, 0.615, 0.615, 1 }); -- danger
     else
-        imgui.PushStyleColor(ImGuiCol_Text, 0.39, 0.96, 0.13, 1); -- success
+        imgui.PushStyleColor(ImGuiCol_Text, { 0.39, 0.96, 0.13, 1 }); -- success
     end
 
-    imgui.PlotHistogram("", plotYields, #plotYields, 0, plotYieldsLabel, FLT_MIN, FLT_MAX, 0.0, state.window.heightPlot);
+    imgui.PlotHistogram("", plotYields, #plotYields, 0, plotYieldsLabel, FLT_MIN, FLT_MAX, { 0.0, state.window.heightPlot });
     imgui.PopStyleColor()
     if imgui.IsItemClicked() then
         state.values.yieldsLabelIndex = cycleIndex(state.values.yieldsLabelIndex, 1, 3);
@@ -1715,14 +1719,14 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     local targetValue = 30000;
 
     if valuesPerHour < targetValue and valuesPerHour >= targetValue/2 then
-        imgui.PushStyleColor(ImGuiCol_Text, 1, 1, 0.54, 1); -- warn
+        imgui.PushStyleColor(ImGuiCol_Text, { 1, 1, 0.54, 1 }); -- warn
     elseif valuesPerHour < targetValue/2 then
-        imgui.PushStyleColor(ImGuiCol_Text, 1, 0.615, 0.615, 1); -- danger
+        imgui.PushStyleColor(ImGuiCol_Text, { 1, 0.615, 0.615, 1 }); -- danger
     else
-        imgui.PushStyleColor(ImGuiCol_Text, 0.39, 0.96, 0.13, 1); -- success
+        imgui.PushStyleColor(ImGuiCol_Text, { 0.39, 0.96, 0.13, 1 }); -- success
     end
 
-    imgui.PlotLines("", plotValues, #plotValues, 0, plotValuesLabel, FLT_MIN, FLT_MAX, 0.0, state.window.heightPlot);
+    imgui.PlotLines("", plotValues, #plotValues, 0, plotValuesLabel, FLT_MIN, FLT_MAX, { 0.0, state.window.heightPlot });
     imgui.PopStyleColor()
     if imgui.IsItemClicked() then
         state.values.valuesLabelIndex = cycleIndex(state.values.valuesLabelIndex, 1, 3);
@@ -1757,7 +1761,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
         [6] = { table.sortKeysByTotalValue(metrics[state.gathering].yields, true), "Value (ASC)"}
     }
 
-    if imgui.BeginChild("Scrolling", -1, state.window.heightYields, true) then
+    if imgui.BeginChild("Scrolling", { -1, state.window.heightYields }, true) then
         imgui.SetWindowFontScale(state.window.scale);
         -- yields
         imgui.PushTextWrapPos(imgui.GetContentRegionAvailWidth());
@@ -1782,7 +1786,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
                 val = getPrice(item);
                 curVal = metrics[state.gathering].estimatedValue;
                 metrics[state.gathering].estimatedValue = curVal - val;
-                imgui.SetVarValue(uiVariables[string.format("var_%s_estimatedValue", state.gathering)][1], metrics[state.gathering].estimatedValue);
+                config.imgui.estValues[state.gathering][1] = metrics[state.gathering].estimatedValue;
             end
             imgui.SameLine(0.0, 1.0);
             imgui.SmallButton("+");
@@ -1792,7 +1796,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
                 val = getPrice(item);
                 curVal = metrics[state.gathering].estimatedValue;
                 metrics[state.gathering].estimatedValue = curVal + val;
-                imgui.SetVarValue(uiVariables[string.format("var_%s_estimatedValue", state.gathering)][1], metrics[state.gathering].estimatedValue);
+                config.imgui.estValues[state.gathering][1] = metrics[state.gathering].estimatedValue;
             end
             imgui.EndGroup();
             if imgui.IsItemHovered() then
@@ -1809,7 +1813,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
             local shortName = config.yields[state.gathering][item].short;
             local adjItemName = shortName or item;
 
-            imgui.TextColored(r/255, g/255, b/255, a/255, adjItemName..":");
+            imgui.TextColored({ r/255, g/255, b/255, a/255 }, adjItemName..":");
 
             imgui.SameLine(0.0, state.window.spaceToolTip);
             imgui.Text(metrics[state.gathering].yields[item]);
@@ -1817,7 +1821,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
             if config.general.showDetailedYields then
                 local pricePer = getPrice(item);
                 local r, g, b, a = colorToRGBA(config.general.yieldDetailsColor);
-                imgui.TextColored(r/255, g/255, b/255, a/255, string.format("@%dea.=(%s)", getPrice(item), math.floor(getPrice(item) * metrics[state.gathering].yields[item])));
+                imgui.TextColored({ r/255, g/255, b/255, a/255 }, string.format("@%dea.=(%s)", getPrice(item), math.floor(getPrice(item) * metrics[state.gathering].yields[item])));
             end
         end
         imgui.PopTextWrapPos();
@@ -1885,7 +1889,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
                 state.timers[timerName] = false
             end
             -- Reset ui variables..
-            imgui.SetVarValue(uiVariables[string.format("var_%s_estimatedValue", state.gathering)][1], metrics[state.gathering].estimatedValue);
+            config.imgui.estValues[state.gathering][1] = metrics[state.gathering].estimatedValue;
             -- Reset the zones..
             config.zones[state.gathering] = {};
             state.values.lastKnownGathering = nil;
@@ -1904,28 +1908,28 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     imgui.SameLine(0.0, state.window.spaceFooterBtn);
 
     if imgui.Button("Settings") then
-        if imgui.GetVarValue(uiVariables["var_HelpVisible"][1]) then
-            imgui.SetVarValue(uiVariables["var_HelpVisible"][1], false);
+        if config.imgui.helpVisible[1] then
+            config.imgui.helpVisible[1] = false;
         end
-        imgui.SetVarValue(uiVariables["var_SettingsVisible"][1], true);
+        config.imgui.settingsVisible[1] = true;
         state.values.centerWindow = true;
     end
 
     imgui.SameLine(0.0, state.window.spaceFooterBtn);
 
     if imgui.Button("Help") then
-        if imgui.GetVarValue(uiVariables["var_SettingsVisible"][1]) then
-            imgui.SetVarValue(uiVariables["var_SettingsVisible"][1], false);
+        if config.imgui.settingsVisible[1] then
+            config.imgui.settingsVisible[1] = false;
         end
-        imgui.SetVarValue(uiVariables["var_HelpVisible"][1], true);
+        config.imgui.helpVisible[1] = true;
         state.values.centerWindow = true;
     end
 
     -- CONFIRM
     local scaledHeightReduction = 0;
     if windowScale == 1.15 then scaledHeightReduction = 10 elseif windowScale == 1.30 then scaledHeightReduction = 16 end;
-    imgui.SetNextWindowSize(state.window.widthModalConfirm, state.window.heightModalConfirm - scaledHeightReduction, ImGuiSetCond_Always)
-    if imgui.BeginPopupModal("Yield Confirm", imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_NoResize)) then
+    imgui.SetNextWindowSize({ state.window.widthModalConfirm, state.window.heightModalConfirm - scaledHeightReduction }, ImGuiSetCond_Always)
+    if imgui.BeginPopupModal("Yield Confirm", config.imgui.windowVisible, bit.bor(ImGuiWindowFlags_NoResize)) then
         imgui.SetWindowFontScale(state.window.scale);
         imgui.Text(state.values.modalConfirmPrompt);
         imgui.Spacing();
@@ -1934,7 +1938,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
             if state.values.modalConfirmDanger then
                 r, g, b, a =  1, 0.615, 0.615, 1
             end
-            imgui.TextColored(r, g, b, a, state.values.modalConfirmHelp);
+            imgui.TextColored({ r, g, b, a }, state.values.modalConfirmHelp);
         end
         imguiFullSep();
         if imgui.Button("Yes") or state.initializing then
@@ -1955,7 +1959,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
         end
         if state.initializing then
             imgui.CloseCurrentPopup();
-            imgui.SetVarValue(uiVariables["var_SettingsVisible"][1], false);
+            config.imgui.settingsVisible[1] = false;
         end
         imgui.EndPopup();
     else
@@ -1973,7 +1977,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     imgui.End();
 
     -- SETTINGS
-    if imgui.GetVarValue(uiVariables["var_SettingsVisible"][1]) then
+    if config.imgui.settingsVisible[1] then
         state.values.settingsWindowOpen = true;
         SettingsWindow:Draw("Yield Settings")
     elseif state.values.settingsWindowOpen then
@@ -1983,7 +1987,7 @@ ashita.events.register('d3d_present', 'on_d3d_present', function()
     -- /SETTINGS
 
     -- HELP
-    if imgui.GetVarValue(uiVariables["var_HelpVisible"][1]) then
+    if config.imgui.helpVisible[1] then
         state.values.helpWindowOpen = true;
         helpWindow:Draw("Yield Help");
     elseif state.values.helpWindowOpen then
@@ -1998,12 +2002,12 @@ end);
 -- desc: Renders the General settings.
 ----------------------------------------------------------------------------------------------------
 function renderSettingsGeneral()
-    if imgui.BeginChild("General", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1])) then
+    if imgui.BeginChild("General", { -1, state.window.heightSettingsContent }, config.imgui.windowVisible) then
         imgui.SetWindowFontScale(state.window.scale);
         imgui.PushItemWidth(state.window.widthWidgetDefault);
 
         imgui.AlignFirstTextHeightToWidgets();
-        imgui.TextColored(1, 1, 0.54, 1, "Window");
+        imgui.TextColored({ 1, 1, 0.54, 1 }, "Window");
 
         local spaceSettingsDefaults = state.window.spaceSettingsDefaults;
         if config.general.showToolTips then spaceSettingsDefaults = spaceSettingsDefaults - ( imgui.GetFontSize() * 24 / defaultFontSize ) end
@@ -2012,19 +2016,22 @@ function renderSettingsGeneral()
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
 
-        --imgui.PushStyleColor(ImGuiCol_Button, 0.21, 0.47, 0.59, 1); -- info
+        --imgui.PushStyleColor(ImGuiCol_Button, { 0.21, 0.47, 0.59, 1 }); -- info
         if imgui.Button("Defaults") then
             config.general = table.copy(templates.defaultSettingsTemplate.general);
-            imgui.SetVarValue(uiVariables["var_WindowOpacity"][1], config.general.opacity);
-            imgui.SetVarValue(uiVariables["var_TargetValue"][1], config.general.targetValue);
-            imgui.SetVarValue(uiVariables["var_ShowToolTips"][1], config.general.showToolTips);
-            imgui.SetVarValue(uiVariables["var_WindowScaleIndex"][1], config.general.windowScaleIndex);
-            imgui.SetVarValue(uiVariables["var_ShowDetailedYields"][1], config.general.showDetailedYields);
-            imgui.SetVarValue(uiVariables["var_UseImageButtons"][1], config.general.useImageButtons);
-            imgui.SetVarValue(uiVariables["var_EnableSoundAlerts"][1], true);
-            imgui.SetVarValue(uiVariables["var_AutoGenReports"][1], true);
+            config.imgui.windowOpacity[1] = config.general.opacity;
+            config.imgui.targetValue[1] = config.general.targetValue;
+            config.imgui.showToolTips[1] = config.general.showToolTips;
+            config.imgui.windowScaleIndex[1] = config.general.windowScaleIndex;
+            config.imgui.showDetailedYields[1] = config.general.showDetailedYields;
+            config.imgui.useImageButtons[1] = config.general.useImageButtons;
+            config.imgui.enableSoundAlerts[1] = true;
+            config.imgui.autoGenReports[1] = true;
             local r, g, b, a = colorToRGBA(config.general.yieldDetailsColor);
-            imgui.SetVarValue(uiVariables["var_YieldDetailsColor"][1], r/255, g/255, b/255, a/255);
+            config.imgui.yieldDetailsColor[1] = r / 255;
+            config.imgui.yieldDetailsColor[2] = g / 255;
+            config.imgui.yieldDetailsColor[3] = b / 255;
+            config.imgui.yieldDetailsColor[4] = a / 255;
         end
         --imgui.PopStyleColor();
 
@@ -2036,7 +2043,7 @@ function renderSettingsGeneral()
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
         if (imgui.SliderFloat("Window Opacity", uiVariables['var_WindowOpacity'][1], 0.25, 1.0, "%1.2f")) then
-            config.general.opacity = imgui.GetVarValue(uiVariables['var_WindowOpacity'][1])
+            config.general.opacity = config.imgui.windowOpacity[1]
         end
         -- /Opacity
 
@@ -2047,8 +2054,8 @@ function renderSettingsGeneral()
         if imguiShowToolTip("Current size for all Yield windows.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
-        if imgui.Combo("Window Size", uiVariables['var_WindowScaleIndex'][1], "Small\0Medium\0Large\0\0") then
-            config.general.windowScaleIndex = imgui.GetVarValue(uiVariables['var_WindowScaleIndex'][1]);
+        if imgui.Combo("Window Size", config.imgui.windowScaleIndex, "Small\0Medium\0Large\0\0") then
+            config.general.windowScaleIndex = config.imgui.windowScaleIndex[1];
         end
         -- /Scale
 
@@ -2063,8 +2070,8 @@ function renderSettingsGeneral()
         if imguiShowToolTip("Amount you would like to earn this session (affects progress bar).", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
-        if (imgui.InputInt("Target Value", uiVariables['var_TargetValue'][1])) then
-            config.general.targetValue = imgui.GetVarValue(uiVariables['var_TargetValue'][1]);
+        if (imgui.InputInt("Target Value", config.imgui.targetValue)) then
+            config.general.targetValue = config.imgui.targetValue[1];
         end
         -- /Target Value
 
@@ -2078,7 +2085,7 @@ function renderSettingsGeneral()
         if imgui.Button("Play") then
         end
         if imgui.IsItemClicked() then
-            local soundFile = imgui.GetVarValue(uiVariables["var_TargetSoundFile"][1]);
+            local soundFile = config.imgui.targetSoundFile[1];
             if soundFile ~= "" then
                 ashita.misc.play_sound(string.format(addon.path.."sounds\\%s", soundFile));
             end
@@ -2086,11 +2093,10 @@ function renderSettingsGeneral()
         imgui.SameLine();
         local scaledWidths ={ [0] = 232, [1] = 268, [2] = 304 };
         imgui.PushItemWidth(scaledWidths[config.general.windowScaleIndex]);
-        if imgui.Combo("Target Alert", uiVariables["var_TargetSoundIndex"][1], getSoundOptions()) then
-            local soundIndex = imgui.GetVarValue(uiVariables["var_TargetSoundIndex"][1]);
+        if imgui.Combo("Target Alert", config.imgui.targetSoundIndex, getSoundOptions()) then
+            local soundIndex = config.imgui.targetSoundIndex[1];
             local soundFile = sounds[soundIndex];
-            imgui.SetVarValue(uiVariables["var_TargetSoundFile"][1], "");
-            imgui.SetVarValue(uiVariables["var_TargetSoundFile"][1], soundFile);
+            config.imgui.targetSoundFile[1] = soundFile;
         end
         imgui.PopItemWidth();
         -- /Target Sound
@@ -2100,8 +2106,8 @@ function renderSettingsGeneral()
         if imguiShowToolTip("Toggles the display of the math breakdown in the scrollable yields list.", config.general.showToolTips) then
             imgui.SameLine(0.0 , state.window.spaceToolTip);
         end
-        if (imgui.Checkbox("Show Detailed Yields", uiVariables['var_ShowDetailedYields'][1])) then
-            config.general.showDetailedYields = imgui.GetVarValue(uiVariables['var_ShowDetailedYields'][1]);
+        if (imgui.Checkbox("Show Detailed Yields", config.imgui.showDetailedYields)) then
+            config.general.showDetailedYields = config.imgui.showDetailedYields[1];
         end
         -- /Detailed Yields
 
@@ -2114,8 +2120,8 @@ function renderSettingsGeneral()
         end
         local r, g, b, a = colorToRGBA(config.general.yieldDetailsColor);
 
-        if imgui.ColorEdit4("Yield Details Color", uiVariables["var_YieldDetailsColor"][1]) then
-            config.general.yieldDetailsColor = colorTableToInt(imgui.GetVarValue(uiVariables["var_YieldDetailsColor"][1]));
+        if imgui.ColorEdit4("Yield Details Color", config.imgui.yieldDetailsColor) then
+            config.general.yieldDetailsColor = colorTableToInt(config.imgui.showDetailedYields);
         end
         -- /Yield Details Color
 
@@ -2126,8 +2132,8 @@ function renderSettingsGeneral()
         if imguiShowToolTip("Toggles the set sound alerts for incoming yields.", config.general.showToolTips) then
             imgui.SameLine(0.0 , state.window.spaceToolTip);
         end
-        if (imgui.Checkbox("Enable Sound Alerts", uiVariables['var_EnableSoundAlerts'][1])) then
-            config.general.enableSoundAlerts = imgui.GetVarValue(uiVariables['var_EnableSoundAlerts'][1]);
+        if (imgui.Checkbox("Enable Sound Alerts", config.imgui.enableSoundAlerts)) then
+            config.general.enableSoundAlerts = config.imgui.enableSoundAlerts[1];
         end
         -- /Sound Alerts
 
@@ -2136,8 +2142,8 @@ function renderSettingsGeneral()
         if imguiShowToolTip("Toggles automatic report generation when zoning or after a data reset (you may still manually generate a report regardless).", config.general.showToolTips) then
             imgui.SameLine(0.0 , state.window.spaceToolTip);
         end
-        if (imgui.Checkbox("Auto Generate Reports", uiVariables['var_AutoGenReports'][1])) then
-            config.general.autoGenReports = imgui.GetVarValue(uiVariables['var_AutoGenReports'][1]);
+        if (imgui.Checkbox("Auto Generate Reports", config.imgui.autoGenReports)) then
+            config.general.autoGenReports = config.imgui.autoGenReports[1];
         end
         -- /Reports
 
@@ -2152,8 +2158,8 @@ function renderSettingsGeneral()
         if imguiShowToolTip("Toggles the display of images used for all gathering buttons. If off, text will be used instead.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
-        if (imgui.Checkbox('Use Image Buttons', uiVariables["var_UseImageButtons"][1])) then
-            config.general.useImageButtons = imgui.GetVarValue(uiVariables["var_UseImageButtons"][1]);
+        if (imgui.Checkbox('Use Image Buttons', config.imgui.useImageButtons)) then
+            config.general.useImageButtons = config.imgui.useImageButtons[1];
         end
         -- /Image Buttons
 
@@ -2162,8 +2168,8 @@ function renderSettingsGeneral()
         if imguiShowToolTip("Toggles the display of (?)s and their tooltips.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
-        if (imgui.Checkbox('Show (?) Tooltips', uiVariables['var_ShowToolTips'][1])) then
-            config.general.showToolTips = imgui.GetVarValue(uiVariables['var_ShowToolTips'][1]);
+        if (imgui.Checkbox('Show (?) Tooltips', config.imgui.showToolTips)) then
+            config.general.showToolTips = config.imgui.showToolTips[1];
         end
         -- /Tooltips
         imgui.PopItemWidth();
@@ -2179,7 +2185,7 @@ end
 function renderSettingsSetPrices()
     local gathering = state.settings.setPrices.gathering
 
-    if imgui.BeginChild("Set Prices", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
+    if imgui.BeginChild("Set Prices", { -1, state.window.heightSettingsContent }, config.imgui.windowVisible, bit.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
         imgui.SetWindowFontScale(state.window.scale);
 
         if imgui.BeginMenuBar() then
@@ -2219,13 +2225,14 @@ function renderSettingsSetPrices()
             if imguiShowToolTip(string.format("Set all %s prices to their default values (0).", string.upperfirst(gathering)), config.general.showToolTips) then
                 imgui.SameLine(0.0, state.window.spaceToolTip);
             end
-            if imgui.SmallButton("Defaults", uiVariables[string.format("var_%s_priceMode", gathering)][1], 2) then
+            if imgui.SmallButton("Defaults", config.imgui.prices[gathering].priceMode, 2) then
                 for yield, data in pairs(config.yields[gathering], true) do
                     config.yields[gathering][yield].singlePrice = 0;
                     config.yields[gathering][yield].stackPrice = 0;
-                    imgui.SetVarValue(uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1], 0, 0);
+                    config.imgui.prices[gathering].yields[yield][1] = 0;
+                    config.imgui.prices[gathering].yields[yield][2] = 0;
                 end
-                imgui.SetVarValue(uiVariables[string.format("var_%s_priceMode", gathering)][1], 0);
+                config.imgui.prices[gathering].priceMode[1] = 0;
             end
             -- Defaults
             imgui.EndMenuBar();
@@ -2295,7 +2302,7 @@ function renderSettingsSetPrices()
                      imguiPushDisabled(disabled);
                      local flags = 0;
                      if disabled then flags = ImGuiInputTextFlags_ReadOnly; end
-                     if imgui.InputInt2(adjItemName, uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1], imgui.bor(flags)) then
+                     if imgui.InputInt2(adjItemName, uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1], bit.bor(flags)) then
                          local prices = imgui.GetVarValue(uiVariables[string.format("var_%s_%s_prices", gathering, yield)][1]);
                          config.yields[gathering][yield].singlePrice = prices[1];
                          config.yields[gathering][yield].stackPrice = prices[2];
@@ -2316,7 +2323,7 @@ end
 ----------------------------------------------------------------------------------------------------
 function renderSettingsSetColors()
     local gathering = state.settings.setColors.gathering;
-    if imgui.BeginChild("Set Colors", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
+    if imgui.BeginChild("Set Colors", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), bit.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
         imgui.SetWindowFontScale(state.window.scale);
         if imgui.BeginMenuBar() then
             local btnAction = function(data)
@@ -2409,7 +2416,7 @@ end
 ----------------------------------------------------------------------------------------------------
 function renderSettingsSetAlerts()
     local gathering = state.settings.setAlerts.gathering;
-    if imgui.BeginChild("Set Alerts", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
+    if imgui.BeginChild("Set Alerts", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), bit.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
         imgui.SetWindowFontScale(state.window.scale);
         if imgui.BeginMenuBar() then
             local btnAction = function(data)
@@ -2585,7 +2592,7 @@ function renderSettingsReports()
     local gathering = state.settings.reports.gathering;
     local sortedReports = table.sortReportsByDate(reports[gathering], true);
     imgui.PushStyleVar(ImGuiStyleVar_WindowPadding, 5, 5);
-    if imgui.BeginChild("Reports", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), imgui.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
+    if imgui.BeginChild("Reports", -1, state.window.heightSettingsContent, imgui.GetVarValue(uiVariables['var_WindowVisible'][1]), bit.bor(ImGuiWindowFlags_MenuBar, ImGuiWindowFlags_NoResize)) then
         imgui.SetWindowFontScale(state.window.scale);
         if imgui.BeginMenuBar() then
             local btnAction = function(data)
@@ -2819,14 +2826,14 @@ function renderSettingsFeedback()
         if imguiShowToolTip("Enter a title for your feedback/issue submission.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
-        imgui.InputText('Title', uiVariables['var_IssueTitle'][1], 128, imgui.bor(ImGuiInputTextFlags_EnterReturnsTrue));
+        imgui.InputText('Title', uiVariables['var_IssueTitle'][1], 128, bit.bor(ImGuiInputTextFlags_EnterReturnsTrue));
         imgui.Spacing();
         imgui.SetCursorPosX(centerWidget);
         imgui.AlignFirstTextHeightToWidgets();
         if imguiShowToolTip("Enter your feedback/issue.", config.general.showToolTips) then
             imgui.SameLine(0.0, state.window.spaceToolTip);
         end
-        imgui.InputTextMultiline('Body', uiVariables['var_IssueBody'][1], 16384, state.window.widthWidgetDefault+75, imgui.GetTextLineHeight() * 16, imgui.bor(ImGuiInputTextFlags_AllowTabInput, ImGuiInputTextFlags_EnterReturnsTrue));
+        imgui.InputTextMultiline('Body', uiVariables['var_IssueBody'][1], 16384, state.window.widthWidgetDefault+75, imgui.GetTextLineHeight() * 16, bit.bor(ImGuiInputTextFlags_AllowTabInput, ImGuiInputTextFlags_EnterReturnsTrue));
         imgui.PopItemWidth();
         imgui.Spacing();
         local widgetPos = state.window.widthWidgetDefault+75

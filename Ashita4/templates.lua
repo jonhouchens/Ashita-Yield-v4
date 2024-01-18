@@ -110,6 +110,50 @@ local stateTemplate =
 -- Template for Yield settings.
 local defaultSettingsTemplate =
 {
+    imgui =
+    {
+        windowVisible          = { true },
+        helpVisible            = { true },
+        settingsVisible        = { true },
+        reportSelected         = { nil },
+        allColors              = { 0, 0, 0, 0 },
+        allSoundIndex          = { 0 },
+        windowOpacity          = { 1.0 },
+        targetValue            = { 0 },
+        targetSoundFile        = { '' },
+        targetSoundIndex       = { nil },
+        fishingSkillSoundFile  = { '' },
+        fishingSkillSoundIndex = { nil },
+        clamBreakSoundFile     = { '' },
+        clamBreakSoundIndex    = { nil },
+        showToolTips           = { true },
+        windowScaleIndex       = { 0 },
+        showDetailedYields     = { true },
+        useImageButtons        = { true },
+        enableSoundAlerts      = { true },
+        autoGenReports         = { true },
+        yieldDetailsColor      = { 0, 0, 0, 0 },
+        prices =
+        {
+            harvesting = { priceMode = { 2 }, yields = { } },
+            excavating = { priceMode = { 2 }, yields = { } },
+            logging    = { priceMode = { 2 }, yields = { } },
+            mining     = { priceMode = { 2 }, yields = { } },
+            clamming   = { priceMode = { 2 }, yields = { } },
+            fishing    = { priceMode = { 2 }, yields = { } },
+            digging    = { priceMode = { 2 }, yields = { } },
+        },
+        estValues =
+        {
+            clamming          = { 0 },
+            digging           = { 0 },
+            fishing           = { 0 },
+            harvesting        = { 0 },
+            excavating        = { 0 },
+            logging           = { 0 },
+            mining            = { 0 },
+        }
+    },
     general =
     {
         opacity               = 1.0,

@@ -325,9 +325,9 @@ end
 ----------------------------------------------------------------------------------------------------
 function imguiPushActiveBtnColor(cond)
     if cond then
-        imgui.PushStyleColor(ImGuiCol_Button, 0.21, 0.47, 0.59, 1); -- info
+        imgui.PushStyleColor(ImGuiCol_Button, { 0.21, 0.47, 0.59, 1 }); -- info
     else
-        imgui.PushStyleColor(ImGuiCol_Button, 0.25, 0.69, 1.0, 0.1); -- secondary
+        imgui.PushStyleColor(ImGuiCol_Button, { 0.25, 0.69, 1.0, 0.1 }); -- secondary
     end
     return cond;
 end
@@ -338,9 +338,9 @@ end
 ----------------------------------------------------------------------------------------------------
 function imguiPushDisabled(cond)
     if cond then
-        imgui.PushStyleVar(ImGuiStyleVar_Alpha, 0.5);
-        imgui.PushStyleColor(ImGuiCol_ButtonHovered, 49/255, 62/255, 75/255, 1);
-        imgui.PushStyleColor(ImGuiCol_ButtonActive, 49/255, 62/255, 75/255, 1);
+        imgui.PushStyleVar(ImGuiStyleVar_Alpha, { 0.5 });
+        imgui.PushStyleColor(ImGuiCol_ButtonHovered, { 49/255, 62/255, 75/255, 1 });
+        imgui.PushStyleColor(ImGuiCol_ButtonActive, { 49/255, 62/255, 75/255, 1 });
     end
     return cond;
 end
