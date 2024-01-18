@@ -27,6 +27,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
 require 'os'
+local ffi = require 'ffi'
+local d3d8 = require 'd3d8'
+local gfxDevice = d3d8.get_device()
 
 ----------------------------------------------------------------------------------------------------
 -- Variables
@@ -88,7 +91,7 @@ end
 ----------------------------------------------------------------------------------------------------
 function helpTitle(context)
     local context = strColor(context, chatColors.danger)
-    return string.format("%s Help: %s", _addon.name, context)
+    return string.format("%s Help: %s", addon.name, context)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -114,7 +117,7 @@ function commandResponse(message, success)
         responseType = 'Error'
         responseColor = chatColors.danger
     end
-    return string.format("%s: %s", 
+    return string.format("%s: %s",
         strColor(responseType, responseColor), strColor(message, chatColors.info)
     )
 end
@@ -226,7 +229,7 @@ end
 -- func: strColor
 -- desc: Add color to a string.
 ----------------------------------------------------------------------------------------------------
-function strColor(str, color) 
+function strColor(str, color)
     return string.format(color, str)
 end
 
@@ -322,9 +325,9 @@ end
 ----------------------------------------------------------------------------------------------------
 function imguiPushActiveBtnColor(cond)
     if cond then
-        imgui.PushStyleColor(ImGuiCol_Button, 0.21, 0.47, 0.59, 1); -- info
+        imgui.PushStyleColor(ImGuiCol_Button, { 0.21, 0.47, 0.59, 1 }); -- info
     else
-        imgui.PushStyleColor(ImGuiCol_Button, 0.25, 0.69, 1.0, 0.1); -- secondary
+        imgui.PushStyleColor(ImGuiCol_Button, { 0.25, 0.69, 1.0, 0.1 }); -- secondary
     end
     return cond;
 end
@@ -335,9 +338,9 @@ end
 ----------------------------------------------------------------------------------------------------
 function imguiPushDisabled(cond)
     if cond then
-        imgui.PushStyleVar(ImGuiStyleVar_Alpha, 0.5);
-        imgui.PushStyleColor(ImGuiCol_ButtonHovered, 49/255, 62/255, 75/255, 1);
-        imgui.PushStyleColor(ImGuiCol_ButtonActive, 49/255, 62/255, 75/255, 1);
+        imgui.PushStyleVar(ImGuiStyleVar_Alpha, { 0.5 });
+        imgui.PushStyleColor(ImGuiCol_ButtonHovered, { 49/255, 62/255, 75/255, 1 });
+        imgui.PushStyleColor(ImGuiCol_ButtonActive, { 49/255, 62/255, 75/255, 1 });
     end
     return cond;
 end
@@ -376,4 +379,18 @@ function table.sumValues(t)
         end
     end
     return val
+end
+
+----------------------------------------------------------------------------------------------------
+-- func: createTexture
+-- desc: Add all the values of the given table.
+----------------------------------------------------------------------------------------------------
+function createTexture(filePath)
+    -- Courtesy of Thorny's mobDb
+    local texPtr = ffi.new('IDirect3DTexture8*[1]')
+    if ffi.C.D3DXCreateTextureFromFileA(gfxDevice, filePath, texPtr) == ffi.C.S_OK then
+        return d3d8.gc_safe_release(ffi.cast('IDirect3DTexture8*', texPtr[0]))
+    end
+
+    return nil
 end
